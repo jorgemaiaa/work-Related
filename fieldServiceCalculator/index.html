@@ -72,8 +72,15 @@
   .tab { height: 100%; }
   .tab[hidden] { display: none !important; }
   #tab-calc { display: grid; grid-template-columns: 380px 1fr; }
-  #tab-agenda { display: grid; grid-template-columns: 1fr 0; transition: grid-template-columns .15s ease; }
-  #tab-agenda.day-open { grid-template-columns: 1fr 380px; }
+  #tab-agenda { display: flex; flex-direction: column; }
+  .agenda-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 0;
+    transition: grid-template-columns .15s ease;
+  }
+  .agenda-body.day-open { grid-template-columns: 1fr 380px; }
 
   /* ---------- Sidebar (calc) ---------- */
   #sidebar {
@@ -491,30 +498,32 @@
 
     <!-- ===== Agenda tab ===== -->
     <section id="tab-agenda" class="tab" hidden>
-      <div id="calendar">
-        <div class="cal-header">
-          <button id="prevMonth" class="ghost">‹</button>
-          <h2 id="monthLabel"></h2>
-          <button id="nextMonth" class="ghost">›</button>
-          <button id="todayBtn" class="ghost">Hoje</button>
-          <div class="spacer"></div>
-          <div class="legend" id="calLegend"></div>
+      <div class="agenda-body" id="agendaBody">
+        <div id="calendar">
+          <div class="cal-header">
+            <button id="prevMonth" class="ghost">‹</button>
+            <h2 id="monthLabel"></h2>
+            <button id="nextMonth" class="ghost">›</button>
+            <button id="todayBtn" class="ghost">Hoje</button>
+            <div class="spacer"></div>
+            <div class="legend" id="calLegend"></div>
+          </div>
+          <div class="cal-weekdays">
+            <div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div><div>Dom</div>
+          </div>
+          <div class="cal-grid" id="calendarGrid"></div>
         </div>
-        <div class="cal-weekdays">
-          <div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div><div>Dom</div>
-        </div>
-        <div class="cal-grid" id="calendarGrid"></div>
+        <aside id="dayPanel" hidden>
+          <header>
+            <h2 id="dayPanelLabel"></h2>
+            <button id="dayPanelClose" class="ghost tiny">✕</button>
+          </header>
+          <div class="record-list" id="recordList"></div>
+          <div class="day-add">
+            <button id="addRecordBtn" class="primary">+ Novo agendamento</button>
+          </div>
+        </aside>
       </div>
-      <aside id="dayPanel" hidden>
-        <header>
-          <h2 id="dayPanelLabel"></h2>
-          <button id="dayPanelClose" class="ghost tiny">✕</button>
-        </header>
-        <div class="record-list" id="recordList"></div>
-        <div class="day-add">
-          <button id="addRecordBtn" class="primary">+ Novo agendamento</button>
-        </div>
-      </aside>
     </section>
   </main>
 
@@ -1053,8 +1062,9 @@
   }
   function placeBannerInAgenda() {
     const el = document.getElementById('authBanner');
-    const cal = document.getElementById('calendar');
-    cal.parentNode.insertBefore(el, cal);
+    const tab = document.getElementById('tab-agenda');
+    const body = document.getElementById('agendaBody');
+    tab.insertBefore(el, body);
   }
 
   // ============================================================
@@ -1154,14 +1164,14 @@
   // ============================================================
   function selectDate(key) {
     selectedDate = key;
-    document.getElementById('tab-agenda').classList.add('day-open');
+    document.getElementById('agendaBody').classList.add('day-open');
     document.getElementById('dayPanel').hidden = false;
     renderCalendar();
     refreshDayPanel();
   }
   document.getElementById('dayPanelClose').addEventListener('click', () => {
     selectedDate = null;
-    document.getElementById('tab-agenda').classList.remove('day-open');
+    document.getElementById('agendaBody').classList.remove('day-open');
     document.getElementById('dayPanel').hidden = true;
     renderCalendar();
   });
@@ -1300,7 +1310,7 @@
         const d = parseDateKey(datetime.slice(0, 10));
         viewMonth = startOfMonth(d);
         selectedDate = dateKey(d);
-        document.getElementById('tab-agenda').classList.add('day-open');
+        document.getElementById('agendaBody').classList.add('day-open');
         document.getElementById('dayPanel').hidden = false;
       }
       closeRecordForm();
