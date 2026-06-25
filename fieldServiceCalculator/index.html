@@ -443,8 +443,15 @@
     }));
 
     const okResults = computed.filter(r => !r.error);
-    const bestCost = Math.min(...okResults.map(r => r.cost));
+    const bestCost = okResults.length ? Math.min(...okResults.map(r => r.cost)) : Infinity;
+    computed.sort((a, b) => {
+      if (a.error && !b.error) return 1;
+      if (!a.error && b.error) return -1;
+      if (a.error && b.error) return 0;
+      return a.cost - b.cost;
+    });
     for (const r of computed) {
+      results.appendChild(r.el);
       renderResult(r, !r.error && r.cost === bestCost);
       if (!r.error) drawRoute(r.t, r.route.geometry, r.cost === bestCost);
     }
