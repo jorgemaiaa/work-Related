@@ -117,7 +117,7 @@ Setup único, ~10 minutos no painel do Cloudflare.
 5. **Policies**:
    - Policy name: `Empresa`
    - Action: **Allow**
-   - Include: **Emails ending in** → `@TEU-DOMÍNIO.com` *(o domínio que pediste)*
+   - Include: **Emails ending in** → `@gocharge.pt`
 6. **App session timer**: 7 dias. **Global session timer** (do Zero Trust → Settings → Authentication): 30 dias.
 7. Save.
 
