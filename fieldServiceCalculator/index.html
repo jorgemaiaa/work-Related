@@ -280,11 +280,7 @@
   let editingId = null;
 
   // ---------- Map ----------
-  const map = L.map('map', {
-    maxBounds: PT_BOUNDS.pad(0.2),
-    maxBoundsViscosity: 0.8,
-    minZoom: 6,
-  }).fitBounds(PT_BOUNDS);
+  const map = L.map('map', { minZoom: 2 }).fitBounds(PT_BOUNDS);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap',
     maxZoom: 18,
