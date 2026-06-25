@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Calculadora de Deslocações — Instaladores PT</title>
+<title>Calculadora & Agenda — Instaladores PT</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
@@ -28,21 +28,62 @@
     color: var(--text);
     background: var(--bg);
     display: grid;
-    grid-template-columns: 380px 1fr;
-    grid-template-rows: 100vh;
+    grid-template-rows: 44px 1fr;
+    height: 100vh;
+    overflow: hidden;
   }
+
+  /* ---------- Tab bar ---------- */
+  #tabbar {
+    display: flex;
+    align-items: stretch;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 12px;
+    gap: 4px;
+  }
+  #tabbar button {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0 16px;
+    font: inherit;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  #tabbar button:hover { color: var(--text); }
+  #tabbar button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  #tabbar .spacer { flex: 1; }
+  #tabbar .user {
+    align-self: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 0 8px;
+  }
+
+  /* ---------- Tabs ---------- */
+  #content { overflow: hidden; position: relative; }
+  .tab { height: 100%; }
+  .tab[hidden] { display: none !important; }
+  #tab-calc { display: grid; grid-template-columns: 380px 1fr; }
+  #tab-agenda { display: grid; grid-template-columns: 1fr 0; transition: grid-template-columns .15s ease; }
+  #tab-agenda.day-open { grid-template-columns: 1fr 380px; }
+
+  /* ---------- Sidebar (calc) ---------- */
   #sidebar {
     background: var(--panel);
     border-right: 1px solid var(--border);
     overflow-y: auto;
     padding: 16px;
   }
-  #map { width: 100%; height: 100vh; }
-  h1 {
-    font-size: 16px;
-    margin: 0 0 4px;
-    letter-spacing: -.01em;
-  }
+  #map { width: 100%; height: 100%; }
+  h1 { font-size: 16px; margin: 0 0 4px; letter-spacing: -.01em; }
   h2 {
     font-size: 12px;
     text-transform: uppercase;
@@ -53,21 +94,16 @@
   p.lead { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
   .search-row { display: flex; gap: 6px; margin-bottom: 8px; }
   .search-row input { flex: 1; }
-  input, select, button {
-    font: inherit;
-    color: inherit;
-  }
-  input[type="text"], input[type="number"], input[type="color"] {
+  input, select, button, textarea { font: inherit; color: inherit; }
+  input[type="text"], input[type="number"], input[type="color"],
+  input[type="datetime-local"], input[type="url"], select, textarea {
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 7px 9px;
     background: #fff;
     width: 100%;
   }
-  input[type="color"] {
-    padding: 2px;
-    height: 32px;
-  }
+  input[type="color"] { padding: 2px; height: 32px; }
   button {
     border: 1px solid var(--border);
     background: #fff;
@@ -83,8 +119,15 @@
     border-color: var(--accent);
   }
   button.primary:hover { background: #1d4ed8; }
+  button.danger {
+    background: #fff;
+    color: var(--danger);
+    border-color: #fecaca;
+  }
+  button.danger:hover { background: #fef2f2; }
   button.ghost { box-shadow: none; }
   button.tiny { padding: 3px 6px; font-size: 12px; }
+
   .job-info {
     background: var(--accent-soft);
     border: 1px solid #c7dbff;
@@ -100,6 +143,7 @@
     color: var(--muted);
   }
   .job-info .coords { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; opacity: .8; }
+
   .results { display: flex; flex-direction: column; gap: 8px; }
   .result {
     border: 1px solid var(--border);
@@ -111,10 +155,7 @@
     gap: 10px;
     align-items: center;
   }
-  .result.best {
-    border-color: var(--good);
-    background: var(--good-soft);
-  }
+  .result.best { border-color: var(--good); background: var(--good-soft); }
   .swatch { width: 12px; height: 12px; border-radius: 3px; }
   .result .name { font-weight: 600; }
   .result .meta { color: var(--muted); font-size: 12px; }
@@ -127,6 +168,7 @@
   .result .price small { font-weight: 500; color: var(--muted); display: block; font-size: 11px; }
   .result.error { background: #fef2f2; border-color: #fecaca; }
   .result.error .price { color: var(--danger); font-size: 12px; }
+
   .badge {
     background: var(--good);
     color: #fff;
@@ -138,6 +180,7 @@
     margin-left: 6px;
     vertical-align: middle;
   }
+
   .installer-list {
     display: flex;
     flex-direction: column;
@@ -157,6 +200,7 @@
   .installer-row .name { font-weight: 600; }
   .installer-row .meta { color: var(--muted); font-size: 12px; }
   .installer-row .actions { display: flex; gap: 4px; }
+
   .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -176,11 +220,9 @@
     padding: 12px;
     margin-top: 8px;
   }
-  .form-section h3 {
-    font-size: 13px;
-    margin: 0 0 8px;
-  }
+  .form-section h3 { font-size: 13px; margin: 0 0 8px; }
   .actions-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+
   .picking-banner {
     position: absolute;
     top: 12px;
@@ -216,44 +258,269 @@
     height: 18px;
     box-shadow: 0 0 0 3px rgba(22,163,74,.35), 0 1px 3px rgba(0,0,0,.4);
   }
+
+  /* ---------- Agenda ---------- */
+  #calendar {
+    display: grid;
+    grid-template-rows: 48px 28px 1fr;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .cal-header h2 {
+    margin: 0;
+    font-size: 16px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text);
+    min-width: 180px;
+  }
+  .cal-header .spacer { flex: 1; }
+  .cal-header .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .cal-header .legend .lg {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .cal-header .legend .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+  }
+  .cal-weekdays div { padding: 6px 8px; text-align: left; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: 1fr;
+    background: var(--border);
+    gap: 1px;
+    overflow: auto;
+  }
+  .day-cell {
+    background: var(--panel);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+    min-height: 90px;
+    transition: background .1s;
+  }
+  .day-cell:hover { background: #f8fafc; }
+  .day-cell.other-month { background: #fafafa; color: #c0c5cd; }
+  .day-cell.other-month:hover { background: #f4f4f5; }
+  .day-cell.today .day-num {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+  .day-cell.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .day-num { font-size: 12px; font-weight: 600; }
+  .day-events { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
+  .event-chip {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+  }
+  .event-chip.shade-light { color: #1f2530; }
+  .event-more { font-size: 10px; color: var(--muted); padding: 0 4px; }
+
+  /* Day detail panel */
+  #dayPanel {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  #dayPanel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  #dayPanel header h2 {
+    margin: 0;
+    font-size: 16px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text);
+  }
+  .record-list { display: flex; flex-direction: column; gap: 8px; }
+  .record-card {
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 10px;
+    background: #fff;
+  }
+  .record-card .row1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .record-card .time { font-weight: 700; font-size: 14px; }
+  .record-card .type { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .record-card .ref { font-weight: 600; margin-bottom: 2px; }
+  .record-card .meta { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .record-card .link a { color: var(--accent); word-break: break-all; }
+  .record-card .actions { display: flex; gap: 6px; margin-top: 8px; }
+  .empty-day { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  .day-add { margin-top: 12px; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 18px;
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    box-shadow: 0 20px 40px rgba(0,0,0,.2);
+  }
+  .modal h3 { margin: 0 0 12px; font-size: 15px; }
+
+  /* Auth banner */
+  .auth-banner {
+    margin: 12px;
+    padding: 12px 14px;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    color: #78350f;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .auth-banner a { color: #78350f; font-weight: 600; }
+
   @media (max-width: 720px) {
-    body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    #tab-calc { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    #tab-agenda.day-open { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
     #sidebar { max-height: 50vh; }
     #map { height: 50vh; }
+    .day-cell { min-height: 64px; }
   }
 </style>
 </head>
 <body>
-  <aside id="sidebar">
-    <h1>Calculadora de Deslocações</h1>
-    <p class="lead">Calcula o custo de ida e volta dos instaladores até ao local da intervenção.</p>
+  <header id="tabbar">
+    <button data-tab="calc" class="active">Calculadora</button>
+    <button data-tab="agenda">Agenda</button>
+    <div class="spacer"></div>
+    <div class="user" id="userBadge"></div>
+  </header>
 
-    <h2>Local do trabalho</h2>
-    <div class="search-row">
-      <input type="text" id="addressInput" placeholder="Procurar morada em Portugal…" autocomplete="off" />
-      <button id="searchBtn" class="primary">Procurar</button>
-    </div>
-    <div class="job-info empty" id="jobInfo">
-      Clica no mapa ou procura uma morada para definir o local.
-    </div>
+  <main id="content">
+    <!-- ===== Calculadora tab ===== -->
+    <section id="tab-calc" class="tab">
+      <aside id="sidebar">
+        <h1>Calculadora de Deslocações</h1>
+        <p class="lead">Calcula o custo de ida e volta dos instaladores até ao local da intervenção.</p>
 
-    <h2>Resultados</h2>
-    <div class="results" id="results">
-      <div class="result"><div></div><div class="meta">Define o local do trabalho para calcular custos.</div><div></div></div>
-    </div>
+        <h2>Local do trabalho</h2>
+        <div class="search-row">
+          <input type="text" id="addressInput" placeholder="Procurar morada em Portugal…" autocomplete="off" />
+          <button id="searchBtn" class="primary">Procurar</button>
+        </div>
+        <div class="job-info empty" id="jobInfo">
+          Clica no mapa ou procura uma morada para definir o local.
+        </div>
 
-    <h2>Instaladores</h2>
-    <div class="installer-list" id="installerList"></div>
-    <div class="actions-row">
-      <button id="addBtn" class="primary">+ Adicionar instalador</button>
-      <button id="resetBtn" class="ghost" title="Restaurar os instaladores predefinidos">Reset</button>
-    </div>
+        <h2>Resultados</h2>
+        <div class="results" id="results">
+          <div class="result"><div></div><div class="meta">Define o local do trabalho para calcular custos.</div><div></div></div>
+        </div>
 
-    <div id="formContainer"></div>
-  </aside>
+        <h2>Instaladores</h2>
+        <div class="installer-list" id="installerList"></div>
+        <div class="actions-row">
+          <button id="addBtn" class="primary">+ Adicionar instalador</button>
+          <button id="resetBtn" class="ghost" title="Restaurar os instaladores predefinidos">Reset</button>
+        </div>
 
-  <div id="map"></div>
+        <div id="formContainer"></div>
+      </aside>
+
+      <div id="map"></div>
+    </section>
+
+    <!-- ===== Agenda tab ===== -->
+    <section id="tab-agenda" class="tab" hidden>
+      <div id="calendar">
+        <div class="cal-header">
+          <button id="prevMonth" class="ghost">‹</button>
+          <h2 id="monthLabel"></h2>
+          <button id="nextMonth" class="ghost">›</button>
+          <button id="todayBtn" class="ghost">Hoje</button>
+          <div class="spacer"></div>
+          <div class="legend" id="calLegend"></div>
+        </div>
+        <div class="cal-weekdays">
+          <div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div><div>Dom</div>
+        </div>
+        <div class="cal-grid" id="calendarGrid"></div>
+      </div>
+      <aside id="dayPanel" hidden>
+        <header>
+          <h2 id="dayPanelLabel"></h2>
+          <button id="dayPanelClose" class="ghost tiny">✕</button>
+        </header>
+        <div class="record-list" id="recordList"></div>
+        <div class="day-add">
+          <button id="addRecordBtn" class="primary">+ Novo agendamento</button>
+        </div>
+      </aside>
+    </section>
+  </main>
+
   <div id="pickingBanner" class="picking-banner" style="display:none;">Clica no mapa para escolher o local…</div>
+  <div id="recordModal" class="modal-backdrop" hidden></div>
+  <div id="authBanner" hidden></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -261,7 +528,9 @@
 (() => {
   'use strict';
 
-  // ---------- Config ----------
+  // ============================================================
+  // Config & shared state
+  // ============================================================
   const DEFAULT_TECHNICIANS = [
     { id: 't_ev',    name: 'EV Chargers', origin: 'Almada', lat: 38.6803, lng: -9.1583, rate: 2,   color: '#16a34a' },
     { id: 't_norte', name: 'Q-CM Norte',  origin: 'Grijó',  lat: 41.0392, lng: -8.5728, rate: 0.4, color: '#1e3a8a' },
@@ -269,26 +538,92 @@
     { id: 't_emob',  name: 'E-Mob',       origin: 'Porto',  lat: 41.1496, lng: -8.6109, rate: 0.4, color: '#38bdf8' },
   ];
   const STORAGE_KEY = 'technicians.v1';
+  const SCHEDULES_CACHE_KEY = 'schedules.v1.cache';
   const PT_BOUNDS = L.latLngBounds([36.8, -9.6], [42.2, -6.1]);
   const FREE_KM = 100;
   const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
   const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
 
-  // ---------- State ----------
+  // Agenda config
+  const TYPE_LABEL = {
+    instalacao: 'Instalação',
+    visita:     'Visita técnica',
+    pos_venda:  'Pós-venda',
+  };
+  const TYPE_ORDER = ['instalacao', 'visita', 'pos_venda'];
+  // family → shade by type
+  const FAMILY_SHADES = {
+    blue:   { instalacao: '#1e3a8a', visita: '#3b82f6', pos_venda: '#bfdbfe' },
+    green:  { instalacao: '#14532d', visita: '#16a34a', pos_venda: '#bbf7d0' },
+    yellow: { instalacao: '#a16207', visita: '#eab308', pos_venda: '#fde68a' },
+  };
+  const FAMILY_LABEL = { blue: 'Q-CM', green: 'EV Chargers', yellow: 'E-Mob' };
+  // installer id → family (canonical brands only)
+  const INSTALLER_FAMILY = {
+    t_ev:    'green',
+    t_norte: 'blue',
+    t_sul:   'blue',
+    t_emob:  'yellow',
+  };
+  function installerFamily(installerId) { return INSTALLER_FAMILY[installerId] || null; }
+  function recordColor(installerId, type) {
+    const fam = installerFamily(installerId);
+    if (fam && FAMILY_SHADES[fam] && FAMILY_SHADES[fam][type]) return FAMILY_SHADES[fam][type];
+    const t = technicians.find(x => x.id === installerId);
+    return t ? t.color : '#9ca3af';
+  }
+  function isLightShade(type) { return type === 'pos_venda'; }
+
   let technicians = loadTechnicians();
-  let job = null; // { lat, lng, label }
-  let pickingTarget = null; // { kind: 'job' | 'installer', resolve(latlng) }
+  let job = null;
+  let pickingTarget = null;
   let editingId = null;
 
-  // ---------- Map ----------
+  // Agenda state
+  let schedules = [];                    // [{id, type, reference, installerId, datetime, link}]
+  let viewMonth = startOfMonth(new Date());
+  let selectedDate = null;               // 'YYYY-MM-DD' or null
+  let agendaMode = 'unknown';            // 'api' | 'local' | 'auth-required' | 'unknown'
+
+  // ============================================================
+  // Persistence (installers + schedules cache)
+  // ============================================================
+  function loadTechnicians() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return clone(DEFAULT_TECHNICIANS);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return clone(DEFAULT_TECHNICIANS);
+      return parsed;
+    } catch (e) {
+      return clone(DEFAULT_TECHNICIANS);
+    }
+  }
+  function saveTechnicians() { localStorage.setItem(STORAGE_KEY, JSON.stringify(technicians)); }
+  function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+  function loadSchedulesCache() {
+    try {
+      const raw = localStorage.getItem(SCHEDULES_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function saveSchedulesCache() {
+    localStorage.setItem(SCHEDULES_CACHE_KEY, JSON.stringify(schedules));
+  }
+
+  // ============================================================
+  // Map
+  // ============================================================
   const map = L.map('map', { minZoom: 2 }).fitBounds(PT_BOUNDS);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap',
     maxZoom: 18,
   }).addTo(map);
-
-  const installerMarkers = new Map(); // id -> marker
-  const routeLayers = new Map();      // id -> polyline
+  const installerMarkers = new Map();
+  const routeLayers = new Map();
   let jobMarker = null;
 
   map.on('click', (e) => {
@@ -301,24 +636,9 @@
     setJob({ lat: e.latlng.lat, lng: e.latlng.lng, label: null });
   });
 
-  // ---------- Persistence ----------
-  function loadTechnicians() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return clone(DEFAULT_TECHNICIANS);
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return clone(DEFAULT_TECHNICIANS);
-      return parsed;
-    } catch (e) {
-      return clone(DEFAULT_TECHNICIANS);
-    }
-  }
-  function saveTechnicians() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(technicians));
-  }
-  function clone(v) { return JSON.parse(JSON.stringify(v)); }
-
-  // ---------- Rendering: installers ----------
+  // ============================================================
+  // Calculadora — installer rendering
+  // ============================================================
   function renderInstallerMarkers() {
     for (const m of installerMarkers.values()) map.removeLayer(m);
     installerMarkers.clear();
@@ -356,7 +676,6 @@
     }
   }
 
-  // ---------- Rendering: job ----------
   function setJob(j) {
     job = j;
     renderJobInfo();
@@ -386,7 +705,9 @@
       <div class="coords">${job.lat.toFixed(5)}, ${job.lng.toFixed(5)}</div>`;
   }
 
-  // ---------- Routing & cost ----------
+  // ============================================================
+  // Routing & cost
+  // ============================================================
   async function osrmRoute(from, to) {
     const url = `${OSRM_BASE}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
     const r = await fetch(url);
@@ -394,18 +715,12 @@
     const data = await r.json();
     if (!data.routes || !data.routes.length) throw new Error('Sem rota');
     const route = data.routes[0];
-    return {
-      distanceKm: route.distance / 1000,
-      durationMin: route.duration / 60,
-      geometry: route.geometry,
-    };
+    return { distanceKm: route.distance / 1000, durationMin: route.duration / 60, geometry: route.geometry };
   }
-
   function clearRoutes() {
     for (const layer of routeLayers.values()) map.removeLayer(layer);
     routeLayers.clear();
   }
-
   function clearResults() {
     document.getElementById('results').innerHTML =
       '<div class="result"><div></div><div class="meta">Define o local do trabalho para calcular custos.</div><div></div></div>';
@@ -416,21 +731,18 @@
         const icon = L.divIcon({
           className: '',
           html: `<div class="installer-pin" style="background:${t.color}"></div>`,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
+          iconSize: [14, 14], iconAnchor: [7, 7],
         });
         m.setIcon(icon);
       }
     }
   }
-
   async function computeAll() {
     if (!job) return;
     clearRoutes();
     const results = document.getElementById('results');
     results.innerHTML = '';
     const pending = technicians.map(t => ({ t, el: appendPending(results, t) }));
-
     const computed = await Promise.all(pending.map(async (p) => {
       try {
         const route = await osrmRoute({ lat: p.t.lat, lng: p.t.lng }, { lat: job.lat, lng: job.lng });
@@ -442,7 +754,6 @@
         return { ...p, error: err.message || 'Erro' };
       }
     }));
-
     const okResults = computed.filter(r => !r.error);
     const bestCost = okResults.length ? Math.min(...okResults.map(r => r.cost)) : Infinity;
     computed.sort((a, b) => {
@@ -458,31 +769,23 @@
     }
     updateBestMarker(okResults, bestCost);
   }
-
   function appendPending(container, t) {
     const el = document.createElement('div');
     el.className = 'result';
     el.innerHTML = `
       <div class="swatch" style="background:${t.color}"></div>
-      <div>
-        <div class="name">${escapeHtml(t.name)}</div>
-        <div class="meta">A calcular…</div>
-      </div>
+      <div><div class="name">${escapeHtml(t.name)}</div><div class="meta">A calcular…</div></div>
       <div class="price"><small>—</small></div>`;
     container.appendChild(el);
     return el;
   }
-
   function renderResult(r, isBest) {
     const t = r.t;
     if (r.error) {
       r.el.className = 'result error';
       r.el.innerHTML = `
         <div class="swatch" style="background:${t.color}"></div>
-        <div>
-          <div class="name">${escapeHtml(t.name)}</div>
-          <div class="meta">${escapeHtml(t.origin)}</div>
-        </div>
+        <div><div class="name">${escapeHtml(t.name)}</div><div class="meta">${escapeHtml(t.origin)}</div></div>
         <div class="price">Erro<br><small>${escapeHtml(r.error)}</small></div>`;
       return;
     }
@@ -498,20 +801,13 @@
       </div>
       <div class="price">${priceLabel}</div>`;
   }
-
   function drawRoute(t, geometry, isBest) {
     const layer = L.geoJSON(geometry, {
-      style: {
-        color: t.color,
-        weight: isBest ? 5 : 3,
-        opacity: isBest ? 0.95 : 0.6,
-        dashArray: isBest ? null : '6 6',
-      },
+      style: { color: t.color, weight: isBest ? 5 : 3, opacity: isBest ? 0.95 : 0.6, dashArray: isBest ? null : '6 6' },
     });
     layer.addTo(map);
     routeLayers.set(t.id, layer);
   }
-
   function updateBestMarker(okResults, bestCost) {
     for (const r of okResults) {
       const m = installerMarkers.get(r.t.id);
@@ -527,7 +823,9 @@
     }
   }
 
-  // ---------- Address search ----------
+  // ============================================================
+  // Address search
+  // ============================================================
   async function searchAddress(query) {
     const url = `${NOMINATIM_BASE}?format=json&limit=1&countrycodes=pt&q=${encodeURIComponent(query)}`;
     const r = await fetch(url, { headers: { 'Accept-Language': 'pt' } });
@@ -537,11 +835,8 @@
     const hit = data[0];
     return { lat: parseFloat(hit.lat), lng: parseFloat(hit.lon), label: hit.display_name };
   }
-
   document.getElementById('searchBtn').addEventListener('click', doSearch);
-  document.getElementById('addressInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') doSearch();
-  });
+  document.getElementById('addressInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
   async function doSearch() {
     const q = document.getElementById('addressInput').value.trim();
     if (!q) return;
@@ -554,33 +849,33 @@
     }
   }
 
-  // ---------- Installer CRUD ----------
-  document.getElementById('addBtn').addEventListener('click', () => openForm(null));
+  // ============================================================
+  // Installer CRUD (sidebar)
+  // ============================================================
+  document.getElementById('addBtn').addEventListener('click', () => openInstallerForm(null));
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (confirm('Restaurar os instaladores predefinidos? As alterações guardadas serão perdidas.')) {
       technicians = clone(DEFAULT_TECHNICIANS);
       saveTechnicians();
-      refreshAll();
+      refreshAllCalc();
     }
   });
-
   document.getElementById('installerList').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const id = btn.dataset.id;
-    if (btn.dataset.act === 'edit') openForm(id);
+    if (btn.dataset.act === 'edit') openInstallerForm(id);
     if (btn.dataset.act === 'del') {
       const t = technicians.find(x => x.id === id);
       if (!t) return;
       if (confirm(`Apagar instalador "${t.name}"?`)) {
         technicians = technicians.filter(x => x.id !== id);
         saveTechnicians();
-        refreshAll();
+        refreshAllCalc();
       }
     }
   });
-
-  function openForm(id) {
+  function openInstallerForm(id) {
     editingId = id;
     const t = id ? technicians.find(x => x.id === id) : null;
     const container = document.getElementById('formContainer');
@@ -588,55 +883,32 @@
       <div class="form-section">
         <h3>${id ? 'Editar instalador' : 'Novo instalador'}</h3>
         <div class="form-grid">
-          <div class="full">
-            <label>Nome</label>
-            <input type="text" id="f_name" value="${t ? escapeAttr(t.name) : ''}" />
-          </div>
-          <div class="full">
-            <label>Origem (etiqueta)</label>
-            <input type="text" id="f_origin" value="${t ? escapeAttr(t.origin) : ''}" />
-          </div>
-          <div>
-            <label>€ / km</label>
-            <input type="number" id="f_rate" min="0" step="0.01" value="${t ? t.rate : '0.4'}" />
-          </div>
-          <div>
-            <label>Cor</label>
-            <input type="color" id="f_color" value="${t ? t.color : '#7c3aed'}" />
-          </div>
-          <div>
-            <label>Latitude</label>
-            <input type="number" id="f_lat" step="0.00001" value="${t ? t.lat : ''}" />
-          </div>
-          <div>
-            <label>Longitude</label>
-            <input type="number" id="f_lng" step="0.00001" value="${t ? t.lng : ''}" />
-          </div>
-          <div class="full">
-            <button type="button" id="f_pick" class="ghost">📍 Escolher local no mapa</button>
-          </div>
+          <div class="full"><label>Nome</label><input type="text" id="f_name" value="${t ? escapeAttr(t.name) : ''}" /></div>
+          <div class="full"><label>Origem (etiqueta)</label><input type="text" id="f_origin" value="${t ? escapeAttr(t.origin) : ''}" /></div>
+          <div><label>€ / km</label><input type="number" id="f_rate" min="0" step="0.01" value="${t ? t.rate : '0.4'}" /></div>
+          <div><label>Cor</label><input type="color" id="f_color" value="${t ? t.color : '#7c3aed'}" /></div>
+          <div><label>Latitude</label><input type="number" id="f_lat" step="0.00001" value="${t ? t.lat : ''}" /></div>
+          <div><label>Longitude</label><input type="number" id="f_lng" step="0.00001" value="${t ? t.lng : ''}" /></div>
+          <div class="full"><button type="button" id="f_pick" class="ghost">📍 Escolher local no mapa</button></div>
         </div>
         <div class="actions-row">
           <button type="button" id="f_cancel" class="ghost">Cancelar</button>
           <button type="button" id="f_save" class="primary">Guardar</button>
         </div>
       </div>`;
-
     document.getElementById('f_pick').addEventListener('click', async () => {
       const latlng = await pickOnMap('installer');
       document.getElementById('f_lat').value = latlng.lat.toFixed(5);
       document.getElementById('f_lng').value = latlng.lng.toFixed(5);
     });
-    document.getElementById('f_cancel').addEventListener('click', closeForm);
-    document.getElementById('f_save').addEventListener('click', saveForm);
+    document.getElementById('f_cancel').addEventListener('click', closeInstallerForm);
+    document.getElementById('f_save').addEventListener('click', saveInstallerForm);
   }
-
-  function closeForm() {
+  function closeInstallerForm() {
     editingId = null;
     document.getElementById('formContainer').innerHTML = '';
   }
-
-  function saveForm() {
+  function saveInstallerForm() {
     const name = document.getElementById('f_name').value.trim();
     const origin = document.getElementById('f_origin').value.trim();
     const rate = parseFloat(document.getElementById('f_rate').value);
@@ -644,8 +916,7 @@
     const lat = parseFloat(document.getElementById('f_lat').value);
     const lng = parseFloat(document.getElementById('f_lng').value);
     if (!name || !origin || !isFinite(rate) || !isFinite(lat) || !isFinite(lng)) {
-      alert('Preenche todos os campos.');
-      return;
+      alert('Preenche todos os campos.'); return;
     }
     if (editingId) {
       const t = technicians.find(x => x.id === editingId);
@@ -657,33 +928,395 @@
       });
     }
     saveTechnicians();
-    closeForm();
-    refreshAll();
+    closeInstallerForm();
+    refreshAllCalc();
   }
-
-  // ---------- Map picking ----------
   function pickOnMap(kind) {
     stopPicking();
     document.getElementById('pickingBanner').style.display = '';
-    return new Promise((resolve) => {
-      pickingTarget = { kind, resolve };
-    });
+    return new Promise((resolve) => { pickingTarget = { kind, resolve }; });
   }
   function stopPicking() {
     pickingTarget = null;
     document.getElementById('pickingBanner').style.display = 'none';
   }
-
-  // ---------- Refresh ----------
-  function refreshAll() {
+  function refreshAllCalc() {
     renderInstallerList();
     renderInstallerMarkers();
     if (job) computeAll();
   }
 
-  // ---------- Utils ----------
+  // ============================================================
+  // Tabs
+  // ============================================================
+  document.querySelectorAll('#tabbar button[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  function switchTab(name) {
+    document.querySelectorAll('#tabbar button[data-tab]').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === name);
+    });
+    document.getElementById('tab-calc').hidden = name !== 'calc';
+    document.getElementById('tab-agenda').hidden = name !== 'agenda';
+    if (name === 'calc') {
+      setTimeout(() => map.invalidateSize(), 0);
+    } else if (name === 'agenda') {
+      ensureAgendaLoaded();
+    }
+  }
+
+  // ============================================================
+  // Agenda — API client
+  // ============================================================
+  async function apiList() {
+    const r = await fetch('/api/schedules', { credentials: 'same-origin' });
+    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
+    if (!r.ok) throw new Error('GET /api/schedules ' + r.status);
+    const data = await r.json();
+    return data.records || [];
+  }
+  async function apiCreate(rec) {
+    const r = await fetch('/api/schedules', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rec),
+    });
+    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
+    if (!r.ok) throw new Error('POST /api/schedules ' + r.status);
+    return (await r.json()).record;
+  }
+  async function apiUpdate(id, rec) {
+    const r = await fetch('/api/schedules/' + encodeURIComponent(id), {
+      method: 'PATCH', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rec),
+    });
+    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
+    if (!r.ok) throw new Error('PATCH /api/schedules/:id ' + r.status);
+    return (await r.json()).record;
+  }
+  async function apiDelete(id) {
+    const r = await fetch('/api/schedules/' + encodeURIComponent(id), {
+      method: 'DELETE', credentials: 'same-origin',
+    });
+    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
+    if (!r.ok) throw new Error('DELETE /api/schedules/:id ' + r.status);
+  }
+
+  // ============================================================
+  // Agenda — loading & banner
+  // ============================================================
+  let agendaInitialized = false;
+  async function ensureAgendaLoaded() {
+    if (agendaInitialized) return;
+    agendaInitialized = true;
+    renderCalendar();
+    renderLegend();
+    try {
+      schedules = await apiList();
+      agendaMode = 'api';
+      saveSchedulesCache();
+      hideBanner();
+    } catch (e) {
+      if (e.code === 'auth') {
+        agendaMode = 'auth-required';
+        schedules = [];
+        showAuthBanner();
+      } else {
+        agendaMode = 'local';
+        schedules = loadSchedulesCache();
+        showLocalBanner(e.message);
+      }
+    }
+    renderCalendar();
+    refreshDayPanel();
+  }
+  function showAuthBanner() {
+    const el = document.getElementById('authBanner');
+    el.hidden = false;
+    el.className = 'auth-banner';
+    el.innerHTML = `🔒 Esta secção é privada. <a href="/api/schedules">Iniciar sessão</a> para ver e editar os agendamentos.`;
+    placeBannerInAgenda();
+  }
+  function showLocalBanner(msg) {
+    const el = document.getElementById('authBanner');
+    el.hidden = false;
+    el.className = 'auth-banner';
+    el.innerHTML = `⚠️ Backend indisponível (${escapeHtml(msg)}). A trabalhar em modo local — alterações guardadas apenas neste browser.`;
+    placeBannerInAgenda();
+  }
+  function hideBanner() {
+    const el = document.getElementById('authBanner');
+    el.hidden = true;
+    if (el.parentNode) el.parentNode.removeChild(el);
+    document.body.appendChild(el);
+  }
+  function placeBannerInAgenda() {
+    const el = document.getElementById('authBanner');
+    const cal = document.getElementById('calendar');
+    cal.parentNode.insertBefore(el, cal);
+  }
+
+  // ============================================================
+  // Agenda — calendar render
+  // ============================================================
+  function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+  function parseDateKey(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+
+  const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  function renderCalendar() {
+    const label = document.getElementById('monthLabel');
+    label.textContent = `${MONTHS_PT[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`;
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+
+    const first = new Date(viewMonth);
+    // dayOfWeek 0=Sun .. we want Mon=0
+    const dow = (first.getDay() + 6) % 7;
+    const gridStart = new Date(first);
+    gridStart.setDate(first.getDate() - dow);
+
+    const todayKey = dateKey(new Date());
+    const recsByDay = bucketRecords(schedules);
+
+    for (let i = 0; i < 42; i++) {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + i);
+      const key = dateKey(cellDate);
+      const isOther = cellDate.getMonth() !== viewMonth.getMonth();
+      const cell = document.createElement('div');
+      cell.className = 'day-cell';
+      if (isOther) cell.classList.add('other-month');
+      if (key === todayKey) cell.classList.add('today');
+      if (key === selectedDate) cell.classList.add('selected');
+      cell.dataset.date = key;
+
+      const recs = (recsByDay.get(key) || []).slice().sort((a, b) => a.datetime.localeCompare(b.datetime));
+      const visible = recs.slice(0, 3);
+      const extra = recs.length - visible.length;
+      const chipsHtml = visible.map(r => {
+        const color = recordColor(r.installerId, r.type);
+        const light = isLightShade(r.type);
+        return `<div class="event-chip${light ? ' shade-light' : ''}" style="background:${color}" title="${escapeAttr(eventChipTitle(r))}">${escapeHtml(formatHm(r.datetime))} ${escapeHtml(r.reference || '—')}</div>`;
+      }).join('');
+      const moreHtml = extra > 0 ? `<div class="event-more">+${extra} mais</div>` : '';
+
+      cell.innerHTML = `
+        <div class="day-num">${cellDate.getDate()}</div>
+        <div class="day-events">${chipsHtml}${moreHtml}</div>`;
+
+      cell.addEventListener('click', () => selectDate(key));
+      grid.appendChild(cell);
+    }
+  }
+
+  function eventChipTitle(r) {
+    const t = technicians.find(x => x.id === r.installerId);
+    return `${TYPE_LABEL[r.type] || r.type} — ${r.reference || '—'} — ${t ? t.name : 'Instalador?'}`;
+  }
+
+  function bucketRecords(records) {
+    const m = new Map();
+    for (const r of records) {
+      const key = r.datetime.slice(0, 10);
+      if (!m.has(key)) m.set(key, []);
+      m.get(key).push(r);
+    }
+    return m;
+  }
+
+  function renderLegend() {
+    const el = document.getElementById('calLegend');
+    el.innerHTML = Object.entries(FAMILY_LABEL).map(([fam, label]) => {
+      const shades = FAMILY_SHADES[fam];
+      return `<span class="lg"><span class="dot" style="background:${shades.instalacao}"></span>${escapeHtml(label)} <span class="dot" style="background:${shades.visita}"></span><span class="dot" style="background:${shades.pos_venda}"></span></span>`;
+    }).join('');
+  }
+
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1);
+    renderCalendar();
+  });
+  document.getElementById('todayBtn').addEventListener('click', () => {
+    viewMonth = startOfMonth(new Date());
+    selectDate(dateKey(new Date()));
+  });
+
+  // ============================================================
+  // Agenda — day panel
+  // ============================================================
+  function selectDate(key) {
+    selectedDate = key;
+    document.getElementById('tab-agenda').classList.add('day-open');
+    document.getElementById('dayPanel').hidden = false;
+    renderCalendar();
+    refreshDayPanel();
+  }
+  document.getElementById('dayPanelClose').addEventListener('click', () => {
+    selectedDate = null;
+    document.getElementById('tab-agenda').classList.remove('day-open');
+    document.getElementById('dayPanel').hidden = true;
+    renderCalendar();
+  });
+  document.getElementById('addRecordBtn').addEventListener('click', () => openRecordForm(null));
+
+  function refreshDayPanel() {
+    if (!selectedDate) return;
+    const d = parseDateKey(selectedDate);
+    document.getElementById('dayPanelLabel').textContent =
+      `${d.getDate()} ${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}`;
+    const list = document.getElementById('recordList');
+    const recs = schedules
+      .filter(r => r.datetime.slice(0, 10) === selectedDate)
+      .sort((a, b) => a.datetime.localeCompare(b.datetime));
+    if (!recs.length) {
+      list.innerHTML = '<div class="empty-day">Sem agendamentos neste dia.</div>';
+      return;
+    }
+    list.innerHTML = recs.map(r => {
+      const t = technicians.find(x => x.id === r.installerId);
+      const color = recordColor(r.installerId, r.type);
+      const linkHtml = r.link
+        ? `<div class="link"><a href="${escapeAttr(r.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.link)}</a></div>`
+        : '';
+      return `
+        <div class="record-card" style="border-left-color:${color}">
+          <div class="row1">
+            <div class="time">${escapeHtml(formatHm(r.datetime))}</div>
+            <div class="type">${escapeHtml(TYPE_LABEL[r.type] || r.type)}</div>
+          </div>
+          <div class="ref">${escapeHtml(r.reference || '—')}</div>
+          <div class="meta">${escapeHtml(t ? t.name + ' — ' + t.origin : 'Instalador desconhecido')}</div>
+          ${linkHtml}
+          <div class="actions">
+            <button class="tiny" data-rec-act="edit" data-id="${escapeAttr(r.id)}">Editar</button>
+            <button class="tiny danger" data-rec-act="del"  data-id="${escapeAttr(r.id)}">Apagar</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  document.getElementById('recordList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-rec-act]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.recAct === 'edit') {
+      const rec = schedules.find(x => x.id === id);
+      if (rec) openRecordForm(rec);
+    } else if (btn.dataset.recAct === 'del') {
+      const rec = schedules.find(x => x.id === id);
+      if (!rec) return;
+      if (!confirm(`Apagar agendamento "${rec.reference || '—'}"?`)) return;
+      try {
+        if (agendaMode === 'api') await apiDelete(id);
+        schedules = schedules.filter(x => x.id !== id);
+        if (agendaMode !== 'api') saveSchedulesCache();
+        renderCalendar();
+        refreshDayPanel();
+      } catch (err) {
+        if (err.code === 'auth') return showAuthBanner();
+        alert('Erro ao apagar: ' + err.message);
+      }
+    }
+  });
+
+  // ============================================================
+  // Agenda — add/edit modal
+  // ============================================================
+  function openRecordForm(record) {
+    const isNew = !record;
+    const defaultDate = selectedDate || dateKey(new Date());
+    const defaultDateTime = record ? record.datetime : `${defaultDate}T09:00`;
+    const installerOpts = technicians.map(t =>
+      `<option value="${escapeAttr(t.id)}" ${record && record.installerId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} — ${escapeHtml(t.origin)}</option>`
+    ).join('');
+    const typeOpts = TYPE_ORDER.map(t =>
+      `<option value="${t}" ${record && record.type === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`
+    ).join('');
+
+    const modal = document.getElementById('recordModal');
+    modal.hidden = false;
+    modal.innerHTML = `
+      <div class="modal">
+        <h3>${isNew ? 'Novo agendamento' : 'Editar agendamento'}</h3>
+        <div class="form-grid">
+          <div class="full"><label>Tipo</label><select id="r_type">${typeOpts}</select></div>
+          <div class="full"><label>Instalador</label><select id="r_installer">${installerOpts}</select></div>
+          <div class="full"><label>Referência</label><input type="text" id="r_ref" value="${record ? escapeAttr(record.reference) : ''}" /></div>
+          <div class="full"><label>Data / hora</label><input type="datetime-local" id="r_dt" value="${escapeAttr(defaultDateTime)}" /></div>
+          <div class="full"><label>Link (opcional)</label><input type="url" id="r_link" placeholder="https://…" value="${record && record.link ? escapeAttr(record.link) : ''}" /></div>
+        </div>
+        <div class="actions-row">
+          <button type="button" class="ghost" id="r_cancel">Cancelar</button>
+          <button type="button" class="primary" id="r_save">${isNew ? 'Criar' : 'Guardar'}</button>
+        </div>
+      </div>`;
+    document.getElementById('r_cancel').addEventListener('click', closeRecordForm);
+    document.getElementById('r_save').addEventListener('click', () => saveRecordForm(record));
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeRecordForm(); }, { once: true });
+  }
+  function closeRecordForm() {
+    const modal = document.getElementById('recordModal');
+    modal.hidden = true;
+    modal.innerHTML = '';
+  }
+  async function saveRecordForm(existing) {
+    const type = document.getElementById('r_type').value;
+    const installerId = document.getElementById('r_installer').value;
+    const reference = document.getElementById('r_ref').value.trim();
+    const datetime = document.getElementById('r_dt').value;
+    const link = document.getElementById('r_link').value.trim();
+    if (!type || !installerId || !datetime) {
+      alert('Tipo, instalador e data/hora são obrigatórios.'); return;
+    }
+    const payload = { type, installerId, reference, datetime, link };
+    try {
+      if (existing) {
+        if (agendaMode === 'api') {
+          const updated = await apiUpdate(existing.id, payload);
+          Object.assign(existing, updated);
+        } else {
+          Object.assign(existing, payload);
+          saveSchedulesCache();
+        }
+      } else {
+        let created;
+        if (agendaMode === 'api') {
+          created = await apiCreate(payload);
+        } else {
+          created = { id: 'r_' + Math.random().toString(36).slice(2, 10), ...payload };
+          saveSchedulesCache();
+        }
+        schedules.push(created);
+        if (agendaMode !== 'api') saveSchedulesCache();
+        // jump view to the date we just added
+        const d = parseDateKey(datetime.slice(0, 10));
+        viewMonth = startOfMonth(d);
+        selectedDate = dateKey(d);
+        document.getElementById('tab-agenda').classList.add('day-open');
+        document.getElementById('dayPanel').hidden = false;
+      }
+      closeRecordForm();
+      renderCalendar();
+      refreshDayPanel();
+    } catch (err) {
+      if (err.code === 'auth') { closeRecordForm(); return showAuthBanner(); }
+      alert('Erro ao guardar: ' + err.message);
+    }
+  }
+
+  // ============================================================
+  // Utils
+  // ============================================================
   function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
   function escapeAttr(s) { return escapeHtml(s); }
   function formatRate(r) { return Number(r).toFixed(2).replace(/\.?0+$/, ''); }
@@ -692,8 +1325,16 @@
     const min = Math.round(m % 60);
     return h > 0 ? `${h} h ${min} min` : `${min} min`;
   }
+  function formatHm(iso) {
+    // iso is 'YYYY-MM-DDTHH:MM' (datetime-local) or full ISO
+    const i = iso.indexOf('T');
+    if (i < 0) return iso;
+    return iso.slice(i + 1, i + 6);
+  }
 
-  // ---------- Init ----------
+  // ============================================================
+  // Init
+  // ============================================================
   renderInstallerList();
   renderInstallerMarkers();
 })();
