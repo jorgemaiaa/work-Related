@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calculadora de Deslocações — Instaladores PT</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --text: #1f2530;
+    --muted: #6b7280;
+    --border: #e3e6eb;
+    --accent: #2563eb;
+    --accent-soft: #e0ecff;
+    --good: #16a34a;
+    --good-soft: #dcfce7;
+    --warn: #b45309;
+    --danger: #dc2626;
+    --shadow: 0 1px 3px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 100vh;
+  }
+  #sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  #map { width: 100%; height: 100vh; }
+  h1 {
+    font-size: 16px;
+    margin: 0 0 4px;
+    letter-spacing: -.01em;
+  }
+  h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin: 18px 0 8px;
+  }
+  p.lead { color: var(--muted); margin: 0 0 16px; font-size: 13px; }
+  .search-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .search-row input { flex: 1; }
+  input, select, button {
+    font: inherit;
+    color: inherit;
+  }
+  input[type="text"], input[type="number"], input[type="color"] {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 9px;
+    background: #fff;
+    width: 100%;
+  }
+  input[type="color"] {
+    padding: 2px;
+    height: 32px;
+  }
+  button {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    padding: 7px 10px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  button:hover { background: #f3f4f6; }
+  button.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  button.primary:hover { background: #1d4ed8; }
+  button.ghost { box-shadow: none; }
+  button.tiny { padding: 3px 6px; font-size: 12px; }
+  .job-info {
+    background: var(--accent-soft);
+    border: 1px solid #c7dbff;
+    border-radius: 8px;
+    padding: 10px;
+    color: #14305f;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .job-info.empty {
+    background: #fafafa;
+    border-color: var(--border);
+    color: var(--muted);
+  }
+  .job-info .coords { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; opacity: .8; }
+  .results { display: flex; flex-direction: column; gap: 8px; }
+  .result {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .result.best {
+    border-color: var(--good);
+    background: var(--good-soft);
+  }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .result .name { font-weight: 600; }
+  .result .meta { color: var(--muted); font-size: 12px; }
+  .result .price {
+    font-weight: 700;
+    font-size: 15px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .result .price small { font-weight: 500; color: var(--muted); display: block; font-size: 11px; }
+  .result.error { background: #fef2f2; border-color: #fecaca; }
+  .result.error .price { color: var(--danger); font-size: 12px; }
+  .badge {
+    background: var(--good);
+    color: #fff;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .installer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .installer-row {
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+  }
+  .installer-row .name { font-weight: 600; }
+  .installer-row .meta { color: var(--muted); font-size: 12px; }
+  .installer-row .actions { display: flex; gap: 4px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .form-grid .full { grid-column: 1 / -1; }
+  label {
+    font-size: 12px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 3px;
+  }
+  .form-section {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+  }
+  .form-section h3 {
+    font-size: 13px;
+    margin: 0 0 8px;
+  }
+  .actions-row { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+  .picking-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111827;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    font-size: 13px;
+  }
+  .leaflet-container { font: inherit; }
+  .job-marker-pin {
+    background: var(--accent);
+    width: 18px;
+    height: 18px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  .installer-pin {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  .installer-pin.best {
+    width: 18px;
+    height: 18px;
+    box-shadow: 0 0 0 3px rgba(22,163,74,.35), 0 1px 3px rgba(0,0,0,.4);
+  }
+  @media (max-width: 720px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    #sidebar { max-height: 50vh; }
+    #map { height: 50vh; }
+  }
+</style>
+</head>
+<body>
+  <aside id="sidebar">
+    <h1>Calculadora de Deslocações</h1>
+    <p class="lead">Calcula o custo de ida e volta dos instaladores até ao local da intervenção.</p>
+
+    <h2>Local do trabalho</h2>
+    <div class="search-row">
+      <input type="text" id="addressInput" placeholder="Procurar morada em Portugal…" autocomplete="off" />
+      <button id="searchBtn" class="primary">Procurar</button>
+    </div>
+    <div class="job-info empty" id="jobInfo">
+      Clica no mapa ou procura uma morada para definir o local.
+    </div>
+
+    <h2>Resultados</h2>
+    <div class="results" id="results">
+      <div class="result"><div></div><div class="meta">Define o local do trabalho para calcular custos.</div><div></div></div>
+    </div>
+
+    <h2>Instaladores</h2>
+    <div class="installer-list" id="installerList"></div>
+    <div class="actions-row">
+      <button id="addBtn" class="primary">+ Adicionar instalador</button>
+      <button id="resetBtn" class="ghost" title="Restaurar os instaladores predefinidos">Reset</button>
+    </div>
+
+    <div id="formContainer"></div>
+  </aside>
+
+  <div id="map"></div>
+  <div id="pickingBanner" class="picking-banner" style="display:none;">Clica no mapa para escolher o local…</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Config ----------
+  const DEFAULT_TECHNICIANS = [
+    { id: 't_ev',   name: 'EV Chargers', origin: 'Almada', lat: 38.6803, lng: -9.1583, rate: 2,   color: '#dc2626' },
+    { id: 't_norte', name: 'Q-CM Norte', origin: 'Grijó',  lat: 41.0392, lng: -8.5728, rate: 0.4, color: '#2563eb' },
+    { id: 't_sul',   name: 'Q-CM Sul',   origin: 'Lisboa', lat: 38.7223, lng: -9.1393, rate: 0.4, color: '#16a34a' },
+  ];
+  const STORAGE_KEY = 'technicians.v1';
+  const PT_BOUNDS = L.latLngBounds([36.8, -9.6], [42.2, -6.1]);
+  const FREE_KM = 100;
+  const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
+  const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
+
+  // ---------- State ----------
+  let technicians = loadTechnicians();
+  let job = null; // { lat, lng, label }
+  let pickingTarget = null; // { kind: 'job' | 'installer', resolve(latlng) }
+  let editingId = null;
+
+  // ---------- Map ----------
+  const map = L.map('map', {
+    maxBounds: PT_BOUNDS.pad(0.2),
+    maxBoundsViscosity: 0.8,
+    minZoom: 6,
+  }).fitBounds(PT_BOUNDS);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 18,
+  }).addTo(map);
+
+  const installerMarkers = new Map(); // id -> marker
+  const routeLayers = new Map();      // id -> polyline
+  let jobMarker = null;
+
+  map.on('click', (e) => {
+    if (pickingTarget) {
+      const target = pickingTarget;
+      stopPicking();
+      target.resolve(e.latlng);
+      return;
+    }
+    setJob({ lat: e.latlng.lat, lng: e.latlng.lng, label: null });
+  });
+
+  // ---------- Persistence ----------
+  function loadTechnicians() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return clone(DEFAULT_TECHNICIANS);
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return clone(DEFAULT_TECHNICIANS);
+      return parsed;
+    } catch (e) {
+      return clone(DEFAULT_TECHNICIANS);
+    }
+  }
+  function saveTechnicians() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(technicians));
+  }
+  function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+  // ---------- Rendering: installers ----------
+  function renderInstallerMarkers() {
+    for (const m of installerMarkers.values()) map.removeLayer(m);
+    installerMarkers.clear();
+    for (const t of technicians) {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="installer-pin" style="background:${t.color}"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+      const marker = L.marker([t.lat, t.lng], { icon, title: `${t.name} — ${t.origin}` })
+        .bindPopup(`<b>${escapeHtml(t.name)}</b><br>${escapeHtml(t.origin)}<br>${formatRate(t.rate)} €/km`);
+      marker.addTo(map);
+      installerMarkers.set(t.id, marker);
+    }
+  }
+
+  function renderInstallerList() {
+    const list = document.getElementById('installerList');
+    list.innerHTML = '';
+    for (const t of technicians) {
+      const row = document.createElement('div');
+      row.className = 'installer-row';
+      row.innerHTML = `
+        <div class="swatch" style="background:${t.color}"></div>
+        <div>
+          <div class="name">${escapeHtml(t.name)}</div>
+          <div class="meta">${escapeHtml(t.origin)} · ${formatRate(t.rate)} €/km</div>
+        </div>
+        <div class="actions">
+          <button class="tiny" data-act="edit" data-id="${t.id}">Editar</button>
+          <button class="tiny" data-act="del"  data-id="${t.id}">Apagar</button>
+        </div>`;
+      list.appendChild(row);
+    }
+  }
+
+  // ---------- Rendering: job ----------
+  function setJob(j) {
+    job = j;
+    renderJobInfo();
+    if (jobMarker) { map.removeLayer(jobMarker); jobMarker = null; }
+    if (!job) { clearResults(); return; }
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="job-marker-pin"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 18],
+    });
+    jobMarker = L.marker([job.lat, job.lng], { icon }).addTo(map);
+    if (job.label) jobMarker.bindPopup(`<b>Local do trabalho</b><br>${escapeHtml(job.label)}`).openPopup();
+    computeAll();
+  }
+
+  function renderJobInfo() {
+    const el = document.getElementById('jobInfo');
+    if (!job) {
+      el.className = 'job-info empty';
+      el.textContent = 'Clica no mapa ou procura uma morada para definir o local.';
+      return;
+    }
+    el.className = 'job-info';
+    el.innerHTML = `
+      <div><b>${job.label ? escapeHtml(job.label) : 'Local selecionado'}</b></div>
+      <div class="coords">${job.lat.toFixed(5)}, ${job.lng.toFixed(5)}</div>`;
+  }
+
+  // ---------- Routing & cost ----------
+  async function osrmRoute(from, to) {
+    const url = `${OSRM_BASE}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('OSRM ' + r.status);
+    const data = await r.json();
+    if (!data.routes || !data.routes.length) throw new Error('Sem rota');
+    const route = data.routes[0];
+    return {
+      distanceKm: route.distance / 1000,
+      durationMin: route.duration / 60,
+      geometry: route.geometry,
+    };
+  }
+
+  function clearRoutes() {
+    for (const layer of routeLayers.values()) map.removeLayer(layer);
+    routeLayers.clear();
+  }
+
+  function clearResults() {
+    document.getElementById('results').innerHTML =
+      '<div class="result"><div></div><div class="meta">Define o local do trabalho para calcular custos.</div><div></div></div>';
+    clearRoutes();
+    for (const t of technicians) {
+      const m = installerMarkers.get(t.id);
+      if (m) {
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="installer-pin" style="background:${t.color}"></div>`,
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+        m.setIcon(icon);
+      }
+    }
+  }
+
+  async function computeAll() {
+    if (!job) return;
+    clearRoutes();
+    const results = document.getElementById('results');
+    results.innerHTML = '';
+    const pending = technicians.map(t => ({ t, el: appendPending(results, t) }));
+
+    const computed = await Promise.all(pending.map(async (p) => {
+      try {
+        const route = await osrmRoute({ lat: p.t.lat, lng: p.t.lng }, { lat: job.lat, lng: job.lng });
+        const roundKm = route.distanceKm * 2;
+        const roundMin = route.durationMin * 2;
+        const cost = roundKm > FREE_KM ? roundKm * p.t.rate : 0;
+        return { ...p, route, roundKm, roundMin, cost, free: cost === 0 };
+      } catch (err) {
+        return { ...p, error: err.message || 'Erro' };
+      }
+    }));
+
+    const okResults = computed.filter(r => !r.error);
+    const bestCost = Math.min(...okResults.map(r => r.cost));
+    for (const r of computed) {
+      renderResult(r, !r.error && r.cost === bestCost);
+      if (!r.error) drawRoute(r.t, r.route.geometry, r.cost === bestCost);
+    }
+    updateBestMarker(okResults, bestCost);
+  }
+
+  function appendPending(container, t) {
+    const el = document.createElement('div');
+    el.className = 'result';
+    el.innerHTML = `
+      <div class="swatch" style="background:${t.color}"></div>
+      <div>
+        <div class="name">${escapeHtml(t.name)}</div>
+        <div class="meta">A calcular…</div>
+      </div>
+      <div class="price"><small>—</small></div>`;
+    container.appendChild(el);
+    return el;
+  }
+
+  function renderResult(r, isBest) {
+    const t = r.t;
+    if (r.error) {
+      r.el.className = 'result error';
+      r.el.innerHTML = `
+        <div class="swatch" style="background:${t.color}"></div>
+        <div>
+          <div class="name">${escapeHtml(t.name)}</div>
+          <div class="meta">${escapeHtml(t.origin)}</div>
+        </div>
+        <div class="price">Erro<br><small>${escapeHtml(r.error)}</small></div>`;
+      return;
+    }
+    r.el.className = 'result' + (isBest ? ' best' : '');
+    const priceLabel = r.free
+      ? `<span>Grátis</span><small>≤ ${FREE_KM} km ida e volta</small>`
+      : `<span>${r.cost.toFixed(2)} €</span><small>${r.roundKm.toFixed(1)} km · ${formatRate(t.rate)} €/km</small>`;
+    r.el.innerHTML = `
+      <div class="swatch" style="background:${t.color}"></div>
+      <div>
+        <div class="name">${escapeHtml(t.name)}${isBest ? '<span class="badge">Melhor</span>' : ''}</div>
+        <div class="meta">${escapeHtml(t.origin)} · ${formatMinutes(r.roundMin)} ida e volta</div>
+      </div>
+      <div class="price">${priceLabel}</div>`;
+  }
+
+  function drawRoute(t, geometry, isBest) {
+    const layer = L.geoJSON(geometry, {
+      style: {
+        color: t.color,
+        weight: isBest ? 5 : 3,
+        opacity: isBest ? 0.95 : 0.6,
+        dashArray: isBest ? null : '6 6',
+      },
+    });
+    layer.addTo(map);
+    routeLayers.set(t.id, layer);
+  }
+
+  function updateBestMarker(okResults, bestCost) {
+    for (const r of okResults) {
+      const m = installerMarkers.get(r.t.id);
+      if (!m) continue;
+      const isBest = r.cost === bestCost;
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="installer-pin${isBest ? ' best' : ''}" style="background:${r.t.color}"></div>`,
+        iconSize: isBest ? [18, 18] : [14, 14],
+        iconAnchor: isBest ? [9, 9] : [7, 7],
+      });
+      m.setIcon(icon);
+    }
+  }
+
+  // ---------- Address search ----------
+  async function searchAddress(query) {
+    const url = `${NOMINATIM_BASE}?format=json&limit=1&countrycodes=pt&q=${encodeURIComponent(query)}`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'pt' } });
+    if (!r.ok) throw new Error('Nominatim ' + r.status);
+    const data = await r.json();
+    if (!data.length) throw new Error('Sem resultados');
+    const hit = data[0];
+    return { lat: parseFloat(hit.lat), lng: parseFloat(hit.lon), label: hit.display_name };
+  }
+
+  document.getElementById('searchBtn').addEventListener('click', doSearch);
+  document.getElementById('addressInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doSearch();
+  });
+  async function doSearch() {
+    const q = document.getElementById('addressInput').value.trim();
+    if (!q) return;
+    try {
+      const hit = await searchAddress(q);
+      setJob(hit);
+      map.setView([hit.lat, hit.lng], 13);
+    } catch (e) {
+      alert('Não foi possível encontrar essa morada: ' + e.message);
+    }
+  }
+
+  // ---------- Installer CRUD ----------
+  document.getElementById('addBtn').addEventListener('click', () => openForm(null));
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (confirm('Restaurar os instaladores predefinidos? As alterações guardadas serão perdidas.')) {
+      technicians = clone(DEFAULT_TECHNICIANS);
+      saveTechnicians();
+      refreshAll();
+    }
+  });
+
+  document.getElementById('installerList').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    if (btn.dataset.act === 'edit') openForm(id);
+    if (btn.dataset.act === 'del') {
+      const t = technicians.find(x => x.id === id);
+      if (!t) return;
+      if (confirm(`Apagar instalador "${t.name}"?`)) {
+        technicians = technicians.filter(x => x.id !== id);
+        saveTechnicians();
+        refreshAll();
+      }
+    }
+  });
+
+  function openForm(id) {
+    editingId = id;
+    const t = id ? technicians.find(x => x.id === id) : null;
+    const container = document.getElementById('formContainer');
+    container.innerHTML = `
+      <div class="form-section">
+        <h3>${id ? 'Editar instalador' : 'Novo instalador'}</h3>
+        <div class="form-grid">
+          <div class="full">
+            <label>Nome</label>
+            <input type="text" id="f_name" value="${t ? escapeAttr(t.name) : ''}" />
+          </div>
+          <div class="full">
+            <label>Origem (etiqueta)</label>
+            <input type="text" id="f_origin" value="${t ? escapeAttr(t.origin) : ''}" />
+          </div>
+          <div>
+            <label>€ / km</label>
+            <input type="number" id="f_rate" min="0" step="0.01" value="${t ? t.rate : '0.4'}" />
+          </div>
+          <div>
+            <label>Cor</label>
+            <input type="color" id="f_color" value="${t ? t.color : '#7c3aed'}" />
+          </div>
+          <div>
+            <label>Latitude</label>
+            <input type="number" id="f_lat" step="0.00001" value="${t ? t.lat : ''}" />
+          </div>
+          <div>
+            <label>Longitude</label>
+            <input type="number" id="f_lng" step="0.00001" value="${t ? t.lng : ''}" />
+          </div>
+          <div class="full">
+            <button type="button" id="f_pick" class="ghost">📍 Escolher local no mapa</button>
+          </div>
+        </div>
+        <div class="actions-row">
+          <button type="button" id="f_cancel" class="ghost">Cancelar</button>
+          <button type="button" id="f_save" class="primary">Guardar</button>
+        </div>
+      </div>`;
+
+    document.getElementById('f_pick').addEventListener('click', async () => {
+      const latlng = await pickOnMap('installer');
+      document.getElementById('f_lat').value = latlng.lat.toFixed(5);
+      document.getElementById('f_lng').value = latlng.lng.toFixed(5);
+    });
+    document.getElementById('f_cancel').addEventListener('click', closeForm);
+    document.getElementById('f_save').addEventListener('click', saveForm);
+  }
+
+  function closeForm() {
+    editingId = null;
+    document.getElementById('formContainer').innerHTML = '';
+  }
+
+  function saveForm() {
+    const name = document.getElementById('f_name').value.trim();
+    const origin = document.getElementById('f_origin').value.trim();
+    const rate = parseFloat(document.getElementById('f_rate').value);
+    const color = document.getElementById('f_color').value;
+    const lat = parseFloat(document.getElementById('f_lat').value);
+    const lng = parseFloat(document.getElementById('f_lng').value);
+    if (!name || !origin || !isFinite(rate) || !isFinite(lat) || !isFinite(lng)) {
+      alert('Preenche todos os campos.');
+      return;
+    }
+    if (editingId) {
+      const t = technicians.find(x => x.id === editingId);
+      Object.assign(t, { name, origin, rate, color, lat, lng });
+    } else {
+      technicians.push({
+        id: 't_' + Math.random().toString(36).slice(2, 9),
+        name, origin, rate, color, lat, lng,
+      });
+    }
+    saveTechnicians();
+    closeForm();
+    refreshAll();
+  }
+
+  // ---------- Map picking ----------
+  function pickOnMap(kind) {
+    stopPicking();
+    document.getElementById('pickingBanner').style.display = '';
+    return new Promise((resolve) => {
+      pickingTarget = { kind, resolve };
+    });
+  }
+  function stopPicking() {
+    pickingTarget = null;
+    document.getElementById('pickingBanner').style.display = 'none';
+  }
+
+  // ---------- Refresh ----------
+  function refreshAll() {
+    renderInstallerList();
+    renderInstallerMarkers();
+    if (job) computeAll();
+  }
+
+  // ---------- Utils ----------
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+  function formatRate(r) { return Number(r).toFixed(2).replace(/\.?0+$/, ''); }
+  function formatMinutes(m) {
+    const h = Math.floor(m / 60);
+    const min = Math.round(m % 60);
+    return h > 0 ? `${h} h ${min} min` : `${min} min`;
+  }
+
+  // ---------- Init ----------
+  renderInstallerList();
+  renderInstallerMarkers();
+})();
+</script>
+</body>
+</html>
