@@ -355,14 +355,18 @@
   .day-events { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
   .event-chip {
     font-size: 11px;
-    padding: 2px 6px;
+    padding: 3px 6px;
     border-radius: 3px;
     color: #fff;
+    overflow: hidden;
+    line-height: 1.25;
+  }
+  .event-chip .l1, .event-chip .l2 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.3;
   }
+  .event-chip .l2 { opacity: .85; font-size: 10px; }
   .event-chip.shade-light { color: #1f2530; }
   .event-more { font-size: 10px; color: var(--muted); padding: 0 4px; }
 
@@ -567,6 +571,7 @@
     yellow: { instalacao: '#a16207', visita: '#eab308', pos_venda: '#fde68a' },
   };
   const FAMILY_LABEL = { blue: 'Q-CM', green: 'EV Chargers', yellow: 'E-Mob' };
+  const PROTOCOLS = ['BYD', 'Dongfeng', 'Farizon', 'Geely', 'Go.Charge', 'Honda', 'Hyundai', 'Importrust', 'Lexus', 'Moon', 'Nissan', 'Retail', 'Toyota', 'XPeng', 'Zeekr'];
   // installer id → family (canonical brands only)
   const INSTALLER_FAMILY = {
     t_ev:    'green',
@@ -1105,12 +1110,15 @@
       cell.dataset.date = key;
 
       const recs = (recsByDay.get(key) || []).slice().sort((a, b) => a.datetime.localeCompare(b.datetime));
-      const visible = recs.slice(0, 3);
+      const visible = recs.slice(0, 2);
       const extra = recs.length - visible.length;
       const chipsHtml = visible.map(r => {
         const color = recordColor(r.installerId, r.type);
         const light = isLightShade(r.type);
-        return `<div class="event-chip${light ? ' shade-light' : ''}" style="background:${color}" title="${escapeAttr(eventChipTitle(r))}">${escapeHtml(formatHm(r.datetime))} ${escapeHtml(r.reference || '—')}</div>`;
+        const line1 = `${escapeHtml(formatHm(r.datetime))} · ${escapeHtml(r.reference || '—')}`;
+        const line2Parts = [r.client, r.protocol].filter(Boolean).map(escapeHtml);
+        const line2 = line2Parts.length ? `<div class="l2">${line2Parts.join(' · ')}</div>` : '';
+        return `<div class="event-chip${light ? ' shade-light' : ''}" style="background:${color}" title="${escapeAttr(eventChipTitle(r))}"><div class="l1">${line1}</div>${line2}</div>`;
       }).join('');
       const moreHtml = extra > 0 ? `<div class="event-more">+${extra} mais</div>` : '';
 
@@ -1125,7 +1133,14 @@
 
   function eventChipTitle(r) {
     const t = technicians.find(x => x.id === r.installerId);
-    return `${TYPE_LABEL[r.type] || r.type} — ${r.reference || '—'} — ${t ? t.name : 'Instalador?'}`;
+    const parts = [
+      TYPE_LABEL[r.type] || r.type,
+      r.reference || '—',
+      r.client,
+      r.protocol,
+      t ? t.name : 'Instalador?',
+    ].filter(Boolean);
+    return parts.join(' — ');
   }
 
   function bucketRecords(records) {
@@ -1196,6 +1211,10 @@
       const linkHtml = r.link
         ? `<div class="link"><a href="${escapeAttr(r.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.link)}</a></div>`
         : '';
+      const clientHtml = r.client
+        ? `<div class="meta"><b>Cliente:</b> ${escapeHtml(r.client)}</div>` : '';
+      const protocolHtml = r.protocol
+        ? `<div class="meta"><b>Protocolo:</b> ${escapeHtml(r.protocol)}</div>` : '';
       return `
         <div class="record-card" style="border-left-color:${color}">
           <div class="row1">
@@ -1203,6 +1222,8 @@
             <div class="type">${escapeHtml(TYPE_LABEL[r.type] || r.type)}</div>
           </div>
           <div class="ref">${escapeHtml(r.reference || '—')}</div>
+          ${clientHtml}
+          ${protocolHtml}
           <div class="meta">${escapeHtml(t ? t.name + ' — ' + t.origin : 'Instalador desconhecido')}</div>
           ${linkHtml}
           <div class="actions">
@@ -1250,6 +1271,9 @@
     const typeOpts = TYPE_ORDER.map(t =>
       `<option value="${t}" ${record && record.type === t ? 'selected' : ''}>${TYPE_LABEL[t]}</option>`
     ).join('');
+    const protocolOpts = `<option value="">— seleccionar —</option>` + PROTOCOLS.map(p =>
+      `<option value="${escapeAttr(p)}" ${record && record.protocol === p ? 'selected' : ''}>${escapeHtml(p)}</option>`
+    ).join('');
 
     const modal = document.getElementById('recordModal');
     modal.hidden = false;
@@ -1260,6 +1284,8 @@
           <div class="full"><label>Tipo</label><select id="r_type">${typeOpts}</select></div>
           <div class="full"><label>Instalador</label><select id="r_installer">${installerOpts}</select></div>
           <div class="full"><label>Referência</label><input type="text" id="r_ref" value="${record ? escapeAttr(record.reference) : ''}" /></div>
+          <div class="full"><label>Nome do cliente</label><input type="text" id="r_client" value="${record && record.client ? escapeAttr(record.client) : ''}" /></div>
+          <div class="full"><label>Protocolo</label><select id="r_protocol">${protocolOpts}</select></div>
           <div class="full"><label>Data / hora</label><input type="datetime-local" id="r_dt" value="${escapeAttr(defaultDateTime)}" /></div>
           <div class="full"><label>Link (opcional)</label><input type="url" id="r_link" placeholder="https://…" value="${record && record.link ? escapeAttr(record.link) : ''}" /></div>
         </div>
@@ -1281,12 +1307,14 @@
     const type = document.getElementById('r_type').value;
     const installerId = document.getElementById('r_installer').value;
     const reference = document.getElementById('r_ref').value.trim();
+    const client = document.getElementById('r_client').value.trim();
+    const protocol = document.getElementById('r_protocol').value;
     const datetime = document.getElementById('r_dt').value;
     const link = document.getElementById('r_link').value.trim();
     if (!type || !installerId || !datetime) {
       alert('Tipo, instalador e data/hora são obrigatórios.'); return;
     }
-    const payload = { type, installerId, reference, datetime, link };
+    const payload = { type, installerId, reference, client, protocol, datetime, link };
     try {
       if (existing) {
         if (agendaMode === 'api') {

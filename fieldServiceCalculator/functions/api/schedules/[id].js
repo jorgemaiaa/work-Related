@@ -53,6 +53,8 @@ export async function onRequestPatch({ request, env, params }) {
     next.datetime = body.datetime;
   }
   if (body.reference !== undefined) next.reference = String(body.reference || '');
+  if (body.client !== undefined) next.client = String(body.client || '');
+  if (body.protocol !== undefined) next.protocol = String(body.protocol || '');
   if (body.link !== undefined) next.link = String(body.link || '');
   next.updatedAt = new Date().toISOString();
   next.updatedBy = email;

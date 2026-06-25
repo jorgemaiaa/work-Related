@@ -39,6 +39,8 @@ function validateNew(body) {
   if (typeof body.installerId !== 'string' || !body.installerId) return 'invalid installerId';
   if (typeof body.datetime !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(body.datetime)) return 'invalid datetime';
   if (body.reference != null && typeof body.reference !== 'string') return 'invalid reference';
+  if (body.client != null && typeof body.client !== 'string') return 'invalid client';
+  if (body.protocol != null && typeof body.protocol !== 'string') return 'invalid protocol';
   if (body.link != null && typeof body.link !== 'string') return 'invalid link';
   return null;
 }
@@ -67,6 +69,8 @@ export async function onRequestPost({ request, env }) {
     type: body.type,
     installerId: body.installerId,
     reference: typeof body.reference === 'string' ? body.reference : '',
+    client: typeof body.client === 'string' ? body.client : '',
+    protocol: typeof body.protocol === 'string' ? body.protocol : '',
     datetime: body.datetime,
     link: typeof body.link === 'string' ? body.link : '',
     createdAt: now,
