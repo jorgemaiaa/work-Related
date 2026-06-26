@@ -2,10 +2,12 @@
 
 App web single-page com dois separadores:
 
-1. **Calculadora** — custo de deslocação de instaladores em Portugal continental (pública).
-2. **Agenda** — calendário mensal de agendamentos (instalação / visita técnica / pós-venda), protegida por Cloudflare Access.
+1. **Calculadora** — custo de deslocação de instaladores em Portugal continental.
+2. **Agenda** — calendário mensal de agendamentos (instalação / visita técnica / pós-venda).
 
-Stack: HTML + Leaflet + OSRM + Nominatim no frontend; Cloudflare Pages + Pages Functions + KV no backend; Cloudflare Access para autenticação.
+Toda a aplicação está protegida por uma palavra-passe partilhada — quem chega ao URL sem cookie de sessão vê um ecrã de login antes de qualquer conteúdo.
+
+Stack: HTML + Leaflet + OSRM + Nominatim no frontend; Cloudflare Pages + Pages Functions + KV no backend; gate de auth feito por uma *middleware* (cookie HMAC-assinado).
 
 ---
 
@@ -58,9 +60,9 @@ Instaladores fora destas famílias (adicionados manualmente) usam a sua `color` 
 
 ### Privacidade
 
-A Agenda chama `/api/schedules` (Pages Function + KV). Toda a rota `/api/*` está protegida por uma **palavra-passe partilhada** (middleware em `functions/api/_middleware.js`) — o público em geral nunca chega ao backend. A sessão dura **30 dias**.
+Toda a aplicação (HTML, JS, `/api/*`) está atrás de uma **palavra-passe partilhada** definida via middleware em `functions/_middleware.js`. Um visitante sem cookie de sessão vê um ecrã de login servido pelo próprio backend — nem chega a transferir o `index.html`. A sessão dura **30 dias**.
 
-Se o backend não responder (deploy ainda não feito, sem rede), a tab cai num modo *local* que guarda em `localStorage` (chave `schedules.v1.cache`) só para experimentar; os dados ficam só no browser.
+Se a Agenda for usada fora do backend (deploy ainda não feito, sem rede, GH Pages), cai num modo *local* que guarda em `localStorage` (chave `schedules.v1.cache`) só para experimentar; os dados ficam só no browser.
 
 ---
 
@@ -71,8 +73,8 @@ fieldServiceCalculator/
 ├── index.html
 ├── README.md
 └── functions/
+    ├── _middleware.js            # gates the whole site, serves login page
     └── api/
-        ├── _middleware.js        # auth gate (cookie + HMAC)
         ├── auth.js               # POST /api/auth (login) + DELETE (logout)
         ├── schedules.js          # GET + POST  /api/schedules
         └── schedules/
@@ -128,11 +130,10 @@ Depois de definir as variáveis: projeto Pages → **Deployments** → **Retry d
 
 ### 5. Como funciona
 
-- A **Calculadora** é pública.
-- Quando se abre a tab **Agenda**, o browser faz `GET /api/schedules`. A *middleware* (`functions/api/_middleware.js`) verifica o cookie de sessão. Se não houver, devolve `401`.
-- A UI abre um modal a pedir a palavra-passe → `POST /api/auth` → o servidor compara (constant-time) com `AGENDA_PASSWORD`. Em caso de sucesso, devolve um cookie HMAC-assinado válido por **30 dias** (`HttpOnly`, `Secure`, `SameSite=Lax`).
-- Pedidos seguintes a `/api/*` passam o cookie e a middleware deixa-os passar.
-- Botão **Sair** no topo apaga o cookie e força nova autenticação.
+- **Toda** a aplicação (HTML, JS estáticos, `/api/*`) está atrás da middleware.
+- Visitante sem cookie de sessão → servida uma página de login HTML mínima (também servida pela middleware). Submeter → `POST /api/auth` → servidor compara (constant-time) com `AGENDA_PASSWORD`. Em caso de sucesso, devolve um cookie HMAC-assinado válido por **30 dias** (`HttpOnly`, `Secure`, `SameSite=Lax`) e a página recarrega para mostrar a app.
+- Se o cookie expira enquanto se está a usar a Agenda, a UI abre um modal inline (sem perder estado) e refaz o pedido.
+- Botão **Sair** no topo apaga o cookie e recarrega a página (voltando ao ecrã de login).
 - Tentativas falhadas: máx. **5 por minuto por IP** (rate limit guardado em KV).
 
 ### 6. (Opcional) Domínio próprio

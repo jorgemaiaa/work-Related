@@ -463,7 +463,7 @@
     <button data-tab="calc" class="active">Calculadora</button>
     <button data-tab="agenda">Agenda</button>
     <div class="spacer"></div>
-    <button id="logoutBtn" class="ghost tiny" style="margin-right:8px; display:none;">Sair</button>
+    <button id="logoutBtn" class="ghost tiny" style="margin-right:8px;">Sair</button>
   </header>
 
   <main id="content">
@@ -968,17 +968,7 @@
   });
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await apiLogout();
-    agendaInitialized = false;
-    agendaMode = 'unknown';
-    schedules = [];
-    setLogoutVisible(false);
-    if (selectedDate) {
-      selectedDate = null;
-      document.getElementById('agendaBody').classList.remove('day-open');
-      document.getElementById('dayPanel').hidden = true;
-    }
-    showAuthRequiredBanner();
-    renderCalendar();
+    location.reload();
   });
   function switchTab(name) {
     document.querySelectorAll('#tabbar button[data-tab]').forEach(b => {
@@ -1113,18 +1103,13 @@
     renderLegend();
     await loadAgenda();
   }
-  function setLogoutVisible(v) {
-    document.getElementById('logoutBtn').style.display = v ? '' : 'none';
-  }
   async function loadAgenda() {
     try {
       schedules = await apiList();
       agendaMode = 'api';
       saveSchedulesCache();
       hideBanner();
-      setLogoutVisible(true);
     } catch (e) {
-      setLogoutVisible(false);
       if (e.code === 'auth') {
         schedules = [];
         showAuthRequiredBanner();
