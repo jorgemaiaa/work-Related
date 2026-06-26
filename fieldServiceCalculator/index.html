@@ -297,6 +297,48 @@
     min-width: 180px;
   }
   .cal-header .spacer { flex: 1; }
+  .filter-wrap { position: relative; }
+  .filter-btn-active {
+    background: var(--accent-soft);
+    border-color: #c7dbff;
+    color: #14305f;
+    font-weight: 600;
+  }
+  .popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 6px 16px rgba(0,0,0,.12);
+    padding: 10px 12px;
+    z-index: 1500;
+    width: 220px;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .popover[hidden] { display: none; }
+  .popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+  }
+  .popover-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .popover-list input { width: auto; padding: 0; }
   .cal-header .legend {
     display: flex;
     flex-wrap: wrap;
@@ -516,6 +558,10 @@
             <h2 id="monthLabel"></h2>
             <button id="nextMonth" class="ghost">›</button>
             <button id="todayBtn" class="ghost">Hoje</button>
+            <div class="filter-wrap">
+              <button id="filterBtn" class="ghost">Filtrar</button>
+              <div id="filterPopover" class="popover" hidden></div>
+            </div>
             <div class="spacer"></div>
             <div class="legend" id="calLegend"></div>
           </div>
@@ -559,6 +605,7 @@
   ];
   const STORAGE_KEY = 'technicians.v1';
   const SCHEDULES_CACHE_KEY = 'schedules.v1.cache';
+  const FILTER_KEY = 'agenda.filter.protocols';
   const PT_BOUNDS = L.latLngBounds([36.8, -9.6], [42.2, -6.1]);
   const FREE_KM = 100;
   const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
@@ -605,6 +652,7 @@
   let viewMonth = startOfMonth(new Date());
   let selectedDate = null;               // 'YYYY-MM-DD' or null
   let agendaMode = 'unknown';            // 'api' | 'local' | 'auth-required' | 'unknown'
+  let filterProtocols = loadProtocolFilter();  // Set<string> — empty = no filter
 
   // ============================================================
   // Persistence (installers + schedules cache)
@@ -633,6 +681,22 @@
   }
   function saveSchedulesCache() {
     localStorage.setItem(SCHEDULES_CACHE_KEY, JSON.stringify(schedules));
+  }
+
+  function loadProtocolFilter() {
+    try {
+      const raw = localStorage.getItem(FILTER_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch (e) { return new Set(); }
+  }
+  function saveProtocolFilter() {
+    localStorage.setItem(FILTER_KEY, JSON.stringify(Array.from(filterProtocols)));
+  }
+  function filterRecords(records) {
+    if (!filterProtocols.size) return records;
+    return records.filter(r => r.protocol && filterProtocols.has(r.protocol));
   }
 
   // ============================================================
@@ -1108,6 +1172,7 @@
     agendaInitialized = true;
     renderCalendar();
     renderLegend();
+    renderFilterButton();
     await loadAgenda();
   }
   async function loadAgenda() {
@@ -1188,7 +1253,7 @@
     gridStart.setDate(first.getDate() - dow);
 
     const todayKey = dateKey(new Date());
-    const recsByDay = bucketRecords(schedules);
+    const recsByDay = bucketRecords(filterRecords(schedules));
 
     for (let i = 0; i < 42; i++) {
       const cellDate = new Date(gridStart);
@@ -1254,6 +1319,61 @@
     }).join('');
   }
 
+  function renderFilterButton() {
+    const btn = document.getElementById('filterBtn');
+    const n = filterProtocols.size;
+    btn.textContent = n ? `Filtrar (${n})` : 'Filtrar';
+    btn.classList.toggle('filter-btn-active', n > 0);
+  }
+  function renderFilterPopover() {
+    const pop = document.getElementById('filterPopover');
+    const items = PROTOCOLS.map(p =>
+      `<label><input type="checkbox" data-proto="${escapeAttr(p)}" ${filterProtocols.has(p) ? 'checked' : ''}/> ${escapeHtml(p)}</label>`
+    ).join('');
+    pop.innerHTML = `
+      <div class="popover-header">
+        <span>Protocolo</span>
+        <button class="tiny ghost" id="filterClear">Limpar</button>
+      </div>
+      <div class="popover-list">${items}</div>`;
+    pop.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const p = cb.dataset.proto;
+        if (cb.checked) filterProtocols.add(p);
+        else filterProtocols.delete(p);
+        saveProtocolFilter();
+        renderFilterButton();
+        renderCalendar();
+        if (selectedDate) refreshDayPanel();
+      });
+    });
+    pop.querySelector('#filterClear').addEventListener('click', () => {
+      filterProtocols.clear();
+      saveProtocolFilter();
+      renderFilterPopover();
+      renderFilterButton();
+      renderCalendar();
+      if (selectedDate) refreshDayPanel();
+    });
+  }
+  document.getElementById('filterBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const pop = document.getElementById('filterPopover');
+    if (pop.hidden) {
+      renderFilterPopover();
+      pop.hidden = false;
+    } else {
+      pop.hidden = true;
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const pop = document.getElementById('filterPopover');
+    if (pop.hidden) return;
+    if (pop.contains(e.target)) return;
+    if (e.target.closest('#filterBtn')) return;
+    pop.hidden = true;
+  });
+
   document.getElementById('prevMonth').addEventListener('click', () => {
     viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1);
     renderCalendar();
@@ -1291,7 +1411,7 @@
     document.getElementById('dayPanelLabel').textContent =
       `${d.getDate()} ${MONTHS_PT[d.getMonth()]} ${d.getFullYear()}`;
     const list = document.getElementById('recordList');
-    const recs = schedules
+    const recs = filterRecords(schedules)
       .filter(r => r.datetime.slice(0, 10) === selectedDate)
       .sort((a, b) => a.datetime.localeCompare(b.datetime));
     if (!recs.length) {
