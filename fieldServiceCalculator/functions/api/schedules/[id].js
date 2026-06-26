@@ -1,18 +1,10 @@
 // Cloudflare Pages Function — /api/schedules/:id
 // PATCH (partial update) and DELETE one record.
+// Auth handled by functions/api/_middleware.js.
 
 const KEY = 'all';
 const TYPES = ['instalacao', 'visita', 'pos_venda'];
 
-function getEmail(request) {
-  return request.headers.get('Cf-Access-Authenticated-User-Email');
-}
-function unauthorized() {
-  return new Response(JSON.stringify({ error: 'auth required' }), {
-    status: 401,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
 async function readAll(env) {
   const raw = await env.SCHEDULES_KV.get(KEY);
   if (!raw) return [];
@@ -28,8 +20,6 @@ async function writeAll(env, records) {
 }
 
 export async function onRequestPatch({ request, env, params }) {
-  const email = getEmail(request);
-  if (!email) return unauthorized();
   const id = params.id;
   let body;
   try { body = await request.json(); }
@@ -57,14 +47,12 @@ export async function onRequestPatch({ request, env, params }) {
   if (body.protocol !== undefined) next.protocol = String(body.protocol || '');
   if (body.link !== undefined) next.link = String(body.link || '');
   next.updatedAt = new Date().toISOString();
-  next.updatedBy = email;
   records[idx] = next;
   await writeAll(env, records);
   return Response.json({ record: next });
 }
 
-export async function onRequestDelete({ request, env, params }) {
-  if (!getEmail(request)) return unauthorized();
+export async function onRequestDelete({ env, params }) {
   const id = params.id;
   const records = await readAll(env);
   const idx = records.findIndex(r => r.id === id);

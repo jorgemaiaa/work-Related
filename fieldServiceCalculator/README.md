@@ -58,7 +58,9 @@ Instaladores fora destas famílias (adicionados manualmente) usam a sua `color` 
 
 ### Privacidade
 
-A Agenda chama `/api/schedules` (Pages Function + KV). A rota está protegida por **Cloudflare Access** — quem não estiver autorizado nunca chega ao backend. Se o backend não responder (deploy ainda não feito, sem rede), a tab cai num modo *local* que guarda em `localStorage` (chave `schedules.v1.cache`) só para experimentar; os dados ficam só no browser.
+A Agenda chama `/api/schedules` (Pages Function + KV). Toda a rota `/api/*` está protegida por uma **palavra-passe partilhada** (middleware em `functions/api/_middleware.js`) — o público em geral nunca chega ao backend. A sessão dura **30 dias**.
+
+Se o backend não responder (deploy ainda não feito, sem rede), a tab cai num modo *local* que guarda em `localStorage` (chave `schedules.v1.cache`) só para experimentar; os dados ficam só no browser.
 
 ---
 
@@ -70,6 +72,8 @@ fieldServiceCalculator/
 ├── README.md
 └── functions/
     └── api/
+        ├── _middleware.js        # auth gate (cookie + HMAC)
+        ├── auth.js               # POST /api/auth (login) + DELETE (logout)
         ├── schedules.js          # GET + POST  /api/schedules
         └── schedules/
             └── [id].js           # PATCH + DELETE /api/schedules/:id
@@ -77,9 +81,9 @@ fieldServiceCalculator/
 
 ---
 
-## Deploy — Cloudflare Pages + KV + Access
+## Deploy — Cloudflare Pages + KV + palavra-passe partilhada
 
-Setup único, ~10 minutos no painel do Cloudflare.
+Setup único, ~10 minutos no painel do Cloudflare. Não precisa de domínio próprio nem de Cloudflare Access.
 
 ### 1. Ligar o repositório a Pages
 
@@ -100,34 +104,42 @@ Setup único, ~10 minutos no painel do Cloudflare.
    - Variable name: `SCHEDULES_KV` *(tem de ser exatamente este — é o nome usado nas Functions)*.
    - KV namespace: escolhe o que acabaste de criar.
 3. Aplica também ao ambiente **Preview** se quiseres testar branches.
-4. Re-deploy para o binding ficar ativo.
 
-### 3. Proteger `/agenda*` e `/api/*` com Access
+### 3. Definir a palavra-passe e o segredo de sessão
 
-1. **Zero Trust** (no menu lateral, em baixo) → primeira vez pede para criar uma equipa (escolhe um nome qualquer).
-2. **Access** → **Applications** → **Add an application** → **Self-hosted**.
-3. Application configuration:
-   - Application name: `Agenda — work-Related`
-   - Session duration: **7 days**
-   - Application domain: `https://<projeto>.pages.dev`
-   - Path: deixar vazio para proteger tudo, OU adicionar duas aplicações separadas:
-     - app A — path `/api/*`
-     - app B — path `/agenda` *(opcional — o frontend já está dentro da mesma página, então o gate da API basta)*
-4. **Identity providers**: ativar **One-time PIN** (envia código por email) ou **Login with Google**. PIN é o magic-link clássico, sem registar nada.
-5. **Policies**:
-   - Policy name: `Empresa`
-   - Action: **Allow**
-   - Include: **Emails ending in** → `@gocharge.pt`
-6. **App session timer**: 7 dias. **Global session timer** (do Zero Trust → Settings → Authentication): 30 dias.
-7. Save.
+No projeto Pages → **Settings → Environment variables** (ou **Variables and Secrets**) → adiciona **duas** variáveis para o ambiente **Production** (e Preview, se usares):
 
-A partir daqui, qualquer pedido a `/api/*` é interceptado por Access. Se passar, a Function recebe o header `Cf-Access-Authenticated-User-Email` e responde. Se não, o utilizador vê o ecrã de login do Cloudflare.
+| Variável            | Tipo            | Valor                                                   |
+| ------------------- | --------------- | ------------------------------------------------------- |
+| `AGENDA_PASSWORD`   | **Encrypt** ✓   | Palavra-passe que vais partilhar com a equipa.          |
+| `SESSION_SECRET`    | **Encrypt** ✓   | String aleatória longa (≥ 32 chars). Usa um gerador.    |
 
-### 4. (Opcional) Domínio próprio
+Gera um `SESSION_SECRET` no terminal:
 
-Em **Pages → Custom domains** podes ligar `agenda.teudominio.com`. Lembra-te de re-apontar a app no Access para o novo domínio.
+```bash
+openssl rand -base64 48
+```
 
-### 5. Desligar o GitHub Pages
+Se mudares o `SESSION_SECRET`, todas as sessões existentes ficam inválidas (toda a gente tem de voltar a entrar). Útil em caso de fuga.
+
+### 4. Re-deploy
+
+Depois de definir as variáveis: projeto Pages → **Deployments** → **Retry deployment** (ou faz um novo push). Bindings e env vars só ficam ativos no próximo deploy.
+
+### 5. Como funciona
+
+- A **Calculadora** é pública.
+- Quando se abre a tab **Agenda**, o browser faz `GET /api/schedules`. A *middleware* (`functions/api/_middleware.js`) verifica o cookie de sessão. Se não houver, devolve `401`.
+- A UI abre um modal a pedir a palavra-passe → `POST /api/auth` → o servidor compara (constant-time) com `AGENDA_PASSWORD`. Em caso de sucesso, devolve um cookie HMAC-assinado válido por **30 dias** (`HttpOnly`, `Secure`, `SameSite=Lax`).
+- Pedidos seguintes a `/api/*` passam o cookie e a middleware deixa-os passar.
+- Botão **Sair** no topo apaga o cookie e força nova autenticação.
+- Tentativas falhadas: máx. **5 por minuto por IP** (rate limit guardado em KV).
+
+### 6. (Opcional) Domínio próprio
+
+Em **Pages → Custom domains** podes ligar `agenda.teudominio.com` quando tiveres um domínio na tua conta Cloudflare.
+
+### 7. Desligar o GitHub Pages
 
 Quando confirmares que o Cloudflare está OK: **GitHub → repo → Settings → Pages → Source: None**. O URL antigo deixa de servir.
 
@@ -143,23 +155,26 @@ python3 -m http.server 8000
 # abrir http://localhost:8000
 ```
 
-A tab Agenda cairá no modo *local* (sem backend) — útil para testar UI mas os dados não persistem para lá deste browser.
+A tab Agenda cairá no modo *local* (sem backend) — útil para testar UI mas os dados ficam só neste browser.
 
 Para testar as Functions localmente, usa `wrangler pages dev`:
 
 ```bash
-npx wrangler pages dev fieldServiceCalculator --kv SCHEDULES_KV
+npx wrangler pages dev fieldServiceCalculator \
+  --kv SCHEDULES_KV \
+  --binding AGENDA_PASSWORD=devpwd \
+  --binding SESSION_SECRET=dev-secret-change-me-please
 ```
-
-Por defeito o `Cf-Access-Authenticated-User-Email` não estará presente em dev, e a Function devolverá 401. Para experimentar, podes manualmente adicionar o header com um proxy ou comentar temporariamente o `if (!getEmail(...))`. Não fazer commit dessa alteração.
 
 ---
 
 ## Notas de segurança
 
-- O backend confia no header `Cf-Access-Authenticated-User-Email`. Isto é seguro **enquanto** Access estiver realmente a proteger a rota `/api/*` no edge. Se removeres a Access policy, a API fica pública (responde 401 sempre, porque o header desaparece — fail-closed).
-- Para mais defesa em profundidade, valida o JWT em `Cf-Access-Jwt-Assertion` contra a chave pública pública da tua equipa. Hoje a app não faz isso — adicionar se a sensibilidade dos dados aumentar.
-- Não há *rate limiting* no backend. Cloudflare aplica limites genéricos; para limites a sério, adicionar regra em **Security → WAF → Rate limiting rules**.
+- **`SESSION_SECRET` é o que protege os cookies.** Tem de ser longo e aleatório. Se vazar, qualquer pessoa pode forjar cookies de sessão até o rodares.
+- **`AGENDA_PASSWORD` é partilhada por toda a equipa.** Quando alguém sai, muda-a — todas as sessões existentes continuam válidas até expirarem (30 dias), excepto se também rodares `SESSION_SECRET` (o que invalida tudo imediatamente).
+- O cookie é `HttpOnly` + `Secure` + `SameSite=Lax`, ou seja: não acessível por JS no browser e só viaja em HTTPS.
+- Rate limit: 5 tentativas falhadas / minuto / IP. Mitiga força-bruta superficial; um atacante distribuído passa por cima. Se for relevante, adicionar **Security → WAF → Rate limiting rules** com limites mais agressivos.
+- Sem auditoria por utilizador (é uma palavra-passe partilhada — não há "quem"). Os campos `createdAt` / `updatedAt` ficam, mas `createdBy` foi removido.
 
 ---
 

@@ -463,7 +463,7 @@
     <button data-tab="calc" class="active">Calculadora</button>
     <button data-tab="agenda">Agenda</button>
     <div class="spacer"></div>
-    <div class="user" id="userBadge"></div>
+    <button id="logoutBtn" class="ghost tiny" style="margin-right:8px; display:none;">Sair</button>
   </header>
 
   <main id="content">
@@ -966,6 +966,20 @@
   document.querySelectorAll('#tabbar button[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await apiLogout();
+    agendaInitialized = false;
+    agendaMode = 'unknown';
+    schedules = [];
+    setLogoutVisible(false);
+    if (selectedDate) {
+      selectedDate = null;
+      document.getElementById('agendaBody').classList.remove('day-open');
+      document.getElementById('dayPanel').hidden = true;
+    }
+    showAuthRequiredBanner();
+    renderCalendar();
+  });
   function switchTab(name) {
     document.querySelectorAll('#tabbar button[data-tab]').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === name);
@@ -980,41 +994,112 @@
   }
 
   // ============================================================
-  // Agenda — API client
+  // Agenda — API client (with shared-password login on 401)
   // ============================================================
+  let loginInFlight = null;
+
+  function showLoginModal(errorMsg) {
+    if (loginInFlight) return loginInFlight;
+    loginInFlight = new Promise((resolve) => {
+      const modal = document.getElementById('recordModal');
+      modal.hidden = false;
+      modal.innerHTML = `
+        <div class="modal">
+          <h3>🔒 Acesso protegido</h3>
+          <p style="margin:0 0 10px; color:var(--muted); font-size:13px;">Introduz a palavra-passe da equipa.</p>
+          <input type="password" id="loginPwd" autocomplete="current-password" />
+          <div id="loginErr" style="color:var(--danger); font-size:12px; margin-top:8px; min-height:14px;">${escapeHtml(errorMsg || '')}</div>
+          <div class="actions-row">
+            <button class="ghost" id="loginCancel">Cancelar</button>
+            <button class="primary" id="loginSubmit">Entrar</button>
+          </div>
+        </div>`;
+      const finish = (ok) => {
+        loginInFlight = null;
+        modal.hidden = true;
+        modal.innerHTML = '';
+        resolve(ok);
+      };
+      const submit = async () => {
+        const pwd = document.getElementById('loginPwd').value;
+        const errEl = document.getElementById('loginErr');
+        errEl.textContent = '';
+        try {
+          const r = await fetch('/api/auth', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pwd }),
+          });
+          if (r.ok) return finish(true);
+          if (r.status === 429) { errEl.textContent = 'Demasiadas tentativas. Tenta dentro de 1 minuto.'; return; }
+          errEl.textContent = 'Palavra-passe incorrecta.';
+        } catch (e) {
+          errEl.textContent = 'Erro de rede: ' + e.message;
+        }
+      };
+      document.getElementById('loginSubmit').addEventListener('click', submit);
+      document.getElementById('loginCancel').addEventListener('click', () => finish(false));
+      const inp = document.getElementById('loginPwd');
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+      setTimeout(() => inp.focus(), 0);
+    });
+    return loginInFlight;
+  }
+
+  async function apiRequest(path, options = {}) {
+    let r;
+    try {
+      r = await fetch(path, { ...options, credentials: 'same-origin' });
+    } catch (e) {
+      const err = new Error('network: ' + e.message);
+      err.code = 'network';
+      throw err;
+    }
+    if (r.status === 404) {
+      const err = new Error('endpoint not found');
+      err.code = 'no-backend';
+      throw err;
+    }
+    if (r.status === 401) {
+      const ok = await showLoginModal();
+      if (!ok) { const err = new Error('login cancelled'); err.code = 'auth'; throw err; }
+      r = await fetch(path, { ...options, credentials: 'same-origin' });
+      if (r.status === 401) { const err = new Error('still unauthenticated'); err.code = 'auth'; throw err; }
+    }
+    return r;
+  }
+
   async function apiList() {
-    const r = await fetch('/api/schedules', { credentials: 'same-origin' });
-    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
+    const r = await apiRequest('/api/schedules');
     if (!r.ok) throw new Error('GET /api/schedules ' + r.status);
     const data = await r.json();
     return data.records || [];
   }
   async function apiCreate(rec) {
-    const r = await fetch('/api/schedules', {
-      method: 'POST', credentials: 'same-origin',
+    const r = await apiRequest('/api/schedules', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rec),
     });
-    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
     if (!r.ok) throw new Error('POST /api/schedules ' + r.status);
     return (await r.json()).record;
   }
   async function apiUpdate(id, rec) {
-    const r = await fetch('/api/schedules/' + encodeURIComponent(id), {
-      method: 'PATCH', credentials: 'same-origin',
+    const r = await apiRequest('/api/schedules/' + encodeURIComponent(id), {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rec),
     });
-    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
     if (!r.ok) throw new Error('PATCH /api/schedules/:id ' + r.status);
     return (await r.json()).record;
   }
   async function apiDelete(id) {
-    const r = await fetch('/api/schedules/' + encodeURIComponent(id), {
-      method: 'DELETE', credentials: 'same-origin',
-    });
-    if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.code = 'auth'; throw e; }
+    const r = await apiRequest('/api/schedules/' + encodeURIComponent(id), { method: 'DELETE' });
     if (!r.ok) throw new Error('DELETE /api/schedules/:id ' + r.status);
+  }
+  async function apiLogout() {
+    try { await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }); } catch (e) {}
   }
 
   // ============================================================
@@ -1026,16 +1111,27 @@
     agendaInitialized = true;
     renderCalendar();
     renderLegend();
+    await loadAgenda();
+  }
+  function setLogoutVisible(v) {
+    document.getElementById('logoutBtn').style.display = v ? '' : 'none';
+  }
+  async function loadAgenda() {
     try {
       schedules = await apiList();
       agendaMode = 'api';
       saveSchedulesCache();
       hideBanner();
+      setLogoutVisible(true);
     } catch (e) {
+      setLogoutVisible(false);
       if (e.code === 'auth') {
-        agendaMode = 'auth-required';
         schedules = [];
-        showAuthBanner();
+        showAuthRequiredBanner();
+      } else if (e.code === 'no-backend' || e.code === 'network') {
+        agendaMode = 'local';
+        schedules = loadSchedulesCache();
+        showLocalBanner(e.message);
       } else {
         agendaMode = 'local';
         schedules = loadSchedulesCache();
@@ -1045,12 +1141,17 @@
     renderCalendar();
     refreshDayPanel();
   }
-  function showAuthBanner() {
+  function showAuthRequiredBanner() {
     const el = document.getElementById('authBanner');
     el.hidden = false;
     el.className = 'auth-banner';
-    el.innerHTML = `🔒 Esta secção é privada. <a href="/api/schedules">Iniciar sessão</a> para ver e editar os agendamentos.`;
+    el.innerHTML = `🔒 Acesso protegido. <a href="#" id="authLink">Iniciar sessão</a> para ver e editar os agendamentos.`;
     placeBannerInAgenda();
+    document.getElementById('authLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const ok = await showLoginModal();
+      if (ok) { hideBanner(); await loadAgenda(); }
+    });
   }
   function showLocalBanner(msg) {
     const el = document.getElementById('authBanner');
@@ -1246,13 +1347,22 @@
       if (!rec) return;
       if (!confirm(`Apagar agendamento "${rec.reference || '—'}"?`)) return;
       try {
-        if (agendaMode === 'api') await apiDelete(id);
+        if (agendaMode === 'api') {
+          await apiDelete(id);
+        } else if (agendaMode === 'local') {
+          // local-only delete
+        } else {
+          // unknown mode — try API
+          await apiDelete(id);
+          agendaMode = 'api';
+          hideBanner();
+        }
         schedules = schedules.filter(x => x.id !== id);
         if (agendaMode !== 'api') saveSchedulesCache();
         renderCalendar();
         refreshDayPanel();
       } catch (err) {
-        if (err.code === 'auth') return showAuthBanner();
+        if (err.code === 'auth') return showAuthRequiredBanner();
         alert('Erro ao apagar: ' + err.message);
       }
     }
@@ -1345,7 +1455,7 @@
       renderCalendar();
       refreshDayPanel();
     } catch (err) {
-      if (err.code === 'auth') { closeRecordForm(); return showAuthBanner(); }
+      if (err.code === 'auth') { closeRecordForm(); return showAuthRequiredBanner(); }
       alert('Erro ao guardar: ' + err.message);
     }
   }

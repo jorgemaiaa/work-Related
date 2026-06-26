@@ -1,25 +1,11 @@
 // Cloudflare Pages Function — /api/schedules
 //
-// Auth: trusts the `Cf-Access-Authenticated-User-Email` header injected by
-// Cloudflare Access. This is safe ONLY when Access actually gates the
-// /api/* route at the edge (configure that in the Access dashboard).
-// If the route is unprotected, anyone can hit it; fail-closed if the
-// header is missing.
-//
-// Storage: a single JSON blob in KV under the key "all".
+// Auth is enforced by functions/api/_middleware.js (shared-password session
+// cookie). If a request reaches here, it's already authenticated.
 
 const KEY = 'all';
 const TYPES = ['instalacao', 'visita', 'pos_venda'];
 
-function getEmail(request) {
-  return request.headers.get('Cf-Access-Authenticated-User-Email');
-}
-function unauthorized() {
-  return new Response(JSON.stringify({ error: 'auth required' }), {
-    status: 401,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
 async function readAll(env) {
   const raw = await env.SCHEDULES_KV.get(KEY);
   if (!raw) return [];
@@ -49,15 +35,12 @@ function newId() {
   return 'r_' + uuid.slice(0, 12);
 }
 
-export async function onRequestGet({ request, env }) {
-  if (!getEmail(request)) return unauthorized();
+export async function onRequestGet({ env }) {
   const records = await readAll(env);
   return Response.json({ records });
 }
 
 export async function onRequestPost({ request, env }) {
-  const email = getEmail(request);
-  if (!email) return unauthorized();
   let body;
   try { body = await request.json(); }
   catch (e) { return new Response('Bad JSON', { status: 400 }); }
@@ -75,7 +58,6 @@ export async function onRequestPost({ request, env }) {
     link: typeof body.link === 'string' ? body.link : '',
     createdAt: now,
     updatedAt: now,
-    createdBy: email,
   };
   const records = await readAll(env);
   records.push(record);
