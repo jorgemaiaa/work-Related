@@ -833,8 +833,9 @@
         const route = await osrmRoute({ lat: p.t.lat, lng: p.t.lng }, { lat: job.lat, lng: job.lng });
         const roundKm = route.distanceKm * 2;
         const roundMin = route.durationMin * 2;
-        const cost = roundKm > FREE_KM ? roundKm * p.t.rate : 0;
-        return { ...p, route, roundKm, roundMin, cost, free: cost === 0 };
+        const billableKm = Math.max(0, roundKm - FREE_KM);
+        const cost = billableKm * p.t.rate;
+        return { ...p, route, roundKm, roundMin, billableKm, cost, free: cost === 0 };
       } catch (err) {
         return { ...p, error: err.message || 'Erro' };
       }
@@ -877,7 +878,7 @@
     r.el.className = 'result' + (isBest ? ' best' : '');
     const priceLabel = r.free
       ? `<span>Grátis</span><small>≤ ${FREE_KM} km ida e volta</small>`
-      : `<span>${r.cost.toFixed(2)} €</span><small>${r.roundKm.toFixed(1)} km · ${formatRate(t.rate)} €/km</small>`;
+      : `<span>${r.cost.toFixed(2)} €</span><small>${r.billableKm.toFixed(1)} km × ${formatRate(t.rate)} €/km (após ${FREE_KM} km)</small>`;
     r.el.innerHTML = `
       <div class="swatch" style="background:${t.color}"></div>
       <div>

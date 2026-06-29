@@ -16,7 +16,7 @@ Stack: HTML + Leaflet + OSRM + Nominatim no frontend; Cloudflare Pages + Pages F
 - **Mapa**: Leaflet sobre tiles do OpenStreetMap.
 - **Local do trabalho**: clica no mapa, ou procura uma morada (Nominatim, restrito a PT).
 - **Rotas**: para cada instalador, faz pedido OSRM origem → trabalho e duplica a distância/duração (ida e volta).
-- **Preço**: `custo = km × €/km` se a ida e volta exceder **100 km**; caso contrário, **grátis**.
+- **Preço**: até **100 km** ida e volta é **grátis**. Acima disso, cobra-se apenas o excedente: `custo = (km − 100) × €/km`. Ex.: 120 km de ida e volta → 20 km cobráveis × €/km.
 - **Resultados** ordenados do mais barato para o mais caro; melhor opção destacada no mapa e na sidebar.
 
 ### Editor de instaladores (browser)
