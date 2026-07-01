@@ -617,27 +617,35 @@
     pos_venda:  'Pós-venda',
   };
   const TYPE_ORDER = ['instalacao', 'visita', 'pos_venda'];
-  // family → shade by type
-  const FAMILY_SHADES = {
-    blue:   { instalacao: '#1e3a8a', visita: '#3b82f6', pos_venda: '#bfdbfe' },
-    green:  { instalacao: '#14532d', visita: '#16a34a', pos_venda: '#bbf7d0' },
-    yellow: { instalacao: '#a16207', visita: '#eab308', pos_venda: '#fde68a' },
-  };
-  const FAMILY_LABEL = { blue: 'Q-CM', green: 'EV Chargers', yellow: 'E-Mob' };
   const PROTOCOLS = ['BYD', 'Dongfeng', 'Farizon', 'Geely', 'Go.Charge', 'Honda', 'Hyundai', 'Importrust', 'Lexus', 'Moon', 'Nissan', 'Retail', 'Toyota', 'XPeng', 'Zeekr'];
-  // installer id → family (canonical brands only)
-  const INSTALLER_FAMILY = {
-    t_ev:    'green',
-    t_norte: 'blue',
-    t_sul:   'blue',
-    t_emob:  'yellow',
-  };
-  function installerFamily(installerId) { return INSTALLER_FAMILY[installerId] || null; }
-  function recordColor(installerId, type) {
-    const fam = installerFamily(installerId);
-    if (fam && FAMILY_SHADES[fam] && FAMILY_SHADES[fam][type]) return FAMILY_SHADES[fam][type];
+
+  function hexToRgb(hex) {
+    let h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (h.length !== 6) return [156, 163, 175];
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function rgbToHex(r, g, b) {
+    const to = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+    return '#' + to(r) + to(g) + to(b);
+  }
+  function mix(hex, target, amount) {
+    const [r1, g1, b1] = hexToRgb(hex);
+    const [r2, g2, b2] = target;
+    return rgbToHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount);
+  }
+  function darken(hex, amount) { return mix(hex, [0, 0, 0], amount); }
+  function lighten(hex, amount) { return mix(hex, [255, 255, 255], amount); }
+
+  function installerColor(installerId) {
     const t = technicians.find(x => x.id === installerId);
     return t ? t.color : '#9ca3af';
+  }
+  function recordColor(installerId, type) {
+    const base = installerColor(installerId);
+    if (type === 'instalacao') return darken(base, 0.35);
+    if (type === 'pos_venda')  return lighten(base, 0.55);
+    return base;
   }
   function isLightShade(type) { return type === 'pos_venda'; }
 
@@ -1340,6 +1348,7 @@
   const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   function renderCalendar() {
+    renderLegend();
     const label = document.getElementById('monthLabel');
     label.textContent = `${MONTHS_PT[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`;
     const grid = document.getElementById('calendarGrid');
@@ -1412,9 +1421,10 @@
 
   function renderLegend() {
     const el = document.getElementById('calLegend');
-    el.innerHTML = Object.entries(FAMILY_LABEL).map(([fam, label]) => {
-      const shades = FAMILY_SHADES[fam];
-      return `<span class="lg"><span class="dot" style="background:${shades.instalacao}"></span>${escapeHtml(label)} <span class="dot" style="background:${shades.visita}"></span><span class="dot" style="background:${shades.pos_venda}"></span></span>`;
+    el.innerHTML = technicians.map(t => {
+      const dark = darken(t.color, 0.35);
+      const light = lighten(t.color, 0.55);
+      return `<span class="lg"><span class="dot" style="background:${dark}"></span><span class="dot" style="background:${t.color}"></span><span class="dot" style="background:${light}"></span> ${escapeHtml(t.name)}</span>`;
     }).join('');
   }
 
