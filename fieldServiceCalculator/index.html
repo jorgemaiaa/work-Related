@@ -939,14 +939,29 @@
   // Installer CRUD (sidebar)
   // ============================================================
   document.getElementById('addBtn').addEventListener('click', () => openInstallerForm(null));
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (confirm('Restaurar os instaladores predefinidos? As alterações guardadas serão perdidas.')) {
-      technicians = clone(DEFAULT_TECHNICIANS);
-      saveTechnicians();
-      refreshAllCalc();
+  document.getElementById('resetBtn').addEventListener('click', async () => {
+    if (!confirm('Restaurar os instaladores predefinidos? As alterações guardadas serão perdidas para todos.')) return;
+    const defaults = clone(DEFAULT_TECHNICIANS);
+    try {
+      const saved = await apiReplaceInstallers(defaults);
+      technicians = saved;
+      installersMode = 'api';
+    } catch (err) {
+      if (err.code === 'no-backend' || err.code === 'network') {
+        technicians = defaults;
+        installersMode = 'local';
+      } else if (err.code !== 'auth') {
+        alert('Erro ao repor instaladores: ' + err.message);
+        return;
+      } else {
+        return;
+      }
     }
+    saveTechnicians();
+    refreshAllCalc();
+    if (agendaInitialized) { renderCalendar(); if (selectedDate) refreshDayPanel(); }
   });
-  document.getElementById('installerList').addEventListener('click', (e) => {
+  document.getElementById('installerList').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
     const id = btn.dataset.id;
@@ -954,11 +969,26 @@
     if (btn.dataset.act === 'del') {
       const t = technicians.find(x => x.id === id);
       if (!t) return;
-      if (confirm(`Apagar instalador "${t.name}"?`)) {
-        technicians = technicians.filter(x => x.id !== id);
-        saveTechnicians();
-        refreshAllCalc();
+      if (!confirm(`Apagar instalador "${t.name}"?`)) return;
+      try {
+        if (installersMode !== 'local') {
+          await apiDeleteInstaller(id);
+          installersMode = 'api';
+        }
+      } catch (err) {
+        if (err.code === 'no-backend' || err.code === 'network') {
+          installersMode = 'local';
+        } else if (err.code === 'auth') {
+          return;
+        } else {
+          alert('Erro ao apagar: ' + err.message);
+          return;
+        }
       }
+      technicians = technicians.filter(x => x.id !== id);
+      saveTechnicians();
+      refreshAllCalc();
+      if (agendaInitialized) { renderCalendar(); if (selectedDate) refreshDayPanel(); }
     }
   });
   function openInstallerForm(id) {
@@ -994,7 +1024,7 @@
     editingId = null;
     document.getElementById('formContainer').innerHTML = '';
   }
-  function saveInstallerForm() {
+  async function saveInstallerForm() {
     const name = document.getElementById('f_name').value.trim();
     const origin = document.getElementById('f_origin').value.trim();
     const rate = parseFloat(document.getElementById('f_rate').value);
@@ -1004,18 +1034,47 @@
     if (!name || !origin || !isFinite(rate) || !isFinite(lat) || !isFinite(lng)) {
       alert('Preenche todos os campos.'); return;
     }
-    if (editingId) {
-      const t = technicians.find(x => x.id === editingId);
-      Object.assign(t, { name, origin, rate, color, lat, lng });
-    } else {
-      technicians.push({
-        id: 't_' + Math.random().toString(36).slice(2, 9),
-        name, origin, rate, color, lat, lng,
-      });
+    const payload = { name, origin, rate, color, lat, lng };
+    try {
+      if (editingId) {
+        let updated;
+        try {
+          updated = await apiUpdateInstaller(editingId, payload);
+          installersMode = 'api';
+        } catch (err) {
+          if (err.code === 'no-backend' || err.code === 'network') {
+            updated = { id: editingId, ...payload };
+            installersMode = 'local';
+          } else {
+            throw err;
+          }
+        }
+        const t = technicians.find(x => x.id === editingId);
+        if (t) Object.assign(t, updated);
+      } else {
+        let created;
+        try {
+          created = await apiCreateInstaller(payload);
+          installersMode = 'api';
+        } catch (err) {
+          if (err.code === 'no-backend' || err.code === 'network') {
+            created = { id: 't_' + Math.random().toString(36).slice(2, 9), ...payload };
+            installersMode = 'local';
+          } else {
+            throw err;
+          }
+        }
+        technicians.push(created);
+      }
+    } catch (err) {
+      if (err.code === 'auth') return;
+      alert('Erro ao guardar: ' + err.message);
+      return;
     }
     saveTechnicians();
     closeInstallerForm();
     refreshAllCalc();
+    if (agendaInitialized) { renderCalendar(); if (selectedDate) refreshDayPanel(); }
   }
   function pickOnMap(kind) {
     stopPicking();
@@ -1162,6 +1221,68 @@
   }
   async function apiLogout() {
     try { await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }); } catch (e) {}
+  }
+
+  // ---- Installers API ----
+  async function apiListInstallers() {
+    const r = await apiRequest('/api/installers');
+    if (!r.ok) throw new Error('GET /api/installers ' + r.status);
+    const data = await r.json();
+    return data.installers || [];
+  }
+  async function apiCreateInstaller(inst) {
+    const r = await apiRequest('/api/installers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inst),
+    });
+    if (!r.ok) throw new Error('POST /api/installers ' + r.status);
+    return (await r.json()).installer;
+  }
+  async function apiUpdateInstaller(id, inst) {
+    const r = await apiRequest('/api/installers/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inst),
+    });
+    if (!r.ok) throw new Error('PATCH /api/installers/:id ' + r.status);
+    return (await r.json()).installer;
+  }
+  async function apiDeleteInstaller(id) {
+    const r = await apiRequest('/api/installers/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (!r.ok) throw new Error('DELETE /api/installers/:id ' + r.status);
+  }
+  async function apiReplaceInstallers(list) {
+    const r = await apiRequest('/api/installers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installers: list }),
+    });
+    if (!r.ok) throw new Error('PUT /api/installers ' + r.status);
+    return (await r.json()).installers;
+  }
+
+  let installersMode = 'unknown'; // 'api' | 'local' | 'unknown'
+  async function loadInstallersFromApi() {
+    try {
+      const fresh = await apiListInstallers();
+      technicians = fresh;
+      installersMode = 'api';
+      saveTechnicians(); // keep local cache in sync
+      refreshAllCalc();
+      // re-render agenda pieces that depend on installers
+      if (agendaInitialized) {
+        renderCalendar();
+        if (selectedDate) refreshDayPanel();
+      }
+    } catch (e) {
+      if (e.code === 'no-backend' || e.code === 'network') {
+        installersMode = 'local';
+      } else if (e.code === 'auth') {
+        // user cancelled login — leave local cache in place
+      }
+      // else: leave silent, technicians already has the local cache
+    }
   }
 
   // ============================================================
@@ -1598,6 +1719,7 @@
   // ============================================================
   renderInstallerList();
   renderInstallerMarkers();
+  loadInstallersFromApi();
 })();
 </script>
 </body>
