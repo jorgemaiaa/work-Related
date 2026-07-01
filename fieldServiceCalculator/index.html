@@ -540,7 +540,6 @@
         <div class="installer-list" id="installerList"></div>
         <div class="actions-row">
           <button id="addBtn" class="primary">+ Adicionar instalador</button>
-          <button id="resetBtn" class="ghost" title="Restaurar os instaladores predefinidos">Reset</button>
         </div>
 
         <div id="formContainer"></div>
@@ -939,28 +938,6 @@
   // Installer CRUD (sidebar)
   // ============================================================
   document.getElementById('addBtn').addEventListener('click', () => openInstallerForm(null));
-  document.getElementById('resetBtn').addEventListener('click', async () => {
-    if (!confirm('Restaurar os instaladores predefinidos? As alterações guardadas serão perdidas para todos.')) return;
-    const defaults = clone(DEFAULT_TECHNICIANS);
-    try {
-      const saved = await apiReplaceInstallers(defaults);
-      technicians = saved;
-      installersMode = 'api';
-    } catch (err) {
-      if (err.code === 'no-backend' || err.code === 'network') {
-        technicians = defaults;
-        installersMode = 'local';
-      } else if (err.code !== 'auth') {
-        alert('Erro ao repor instaladores: ' + err.message);
-        return;
-      } else {
-        return;
-      }
-    }
-    saveTechnicians();
-    refreshAllCalc();
-    if (agendaInitialized) { renderCalendar(); if (selectedDate) refreshDayPanel(); }
-  });
   document.getElementById('installerList').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
