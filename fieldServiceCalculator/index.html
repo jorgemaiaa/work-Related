@@ -840,9 +840,10 @@
         const route = await osrmRoute({ lat: p.t.lat, lng: p.t.lng }, { lat: job.lat, lng: job.lng });
         const roundKm = route.distanceKm * 2;
         const roundMin = route.durationMin * 2;
-        const billableKm = Math.max(0, roundKm - FREE_KM);
+        const freeKm = typeof p.t.freeKm === 'number' && p.t.freeKm >= 0 ? p.t.freeKm : FREE_KM;
+        const billableKm = Math.max(0, roundKm - freeKm);
         const cost = billableKm * p.t.rate;
-        return { ...p, route, roundKm, roundMin, billableKm, cost, free: cost === 0 };
+        return { ...p, route, roundKm, roundMin, billableKm, cost, freeKm, free: cost === 0 };
       } catch (err) {
         return { ...p, error: err.message || 'Erro' };
       }
@@ -884,8 +885,8 @@
     }
     r.el.className = 'result' + (isBest ? ' best' : '');
     const priceLabel = r.free
-      ? `<span>Grátis</span><small>≤ ${FREE_KM} km ida e volta</small>`
-      : `<span>${r.cost.toFixed(2)} €</span><small>${r.billableKm.toFixed(1)} km × ${formatRate(t.rate)} €/km (após ${FREE_KM} km)</small>`;
+      ? `<span>Grátis</span><small>≤ ${r.freeKm} km ida e volta</small>`
+      : `<span>${r.cost.toFixed(2)} €</span><small>${r.billableKm.toFixed(1)} km × ${formatRate(t.rate)} €/km (após ${r.freeKm} km)</small>`;
     r.el.innerHTML = `
       <div class="swatch" style="background:${t.color}"></div>
       <div>
@@ -987,6 +988,7 @@
           <div class="full"><label>Nome</label><input type="text" id="f_name" value="${t ? escapeAttr(t.name) : ''}" /></div>
           <div class="full"><label>Origem (etiqueta)</label><input type="text" id="f_origin" value="${t ? escapeAttr(t.origin) : ''}" /></div>
           <div><label>€ / km</label><input type="number" id="f_rate" min="0" step="0.01" value="${t ? t.rate : '0.4'}" /></div>
+          <div><label>Km grátis (ida+volta)</label><input type="number" id="f_freeKm" min="0" step="1" value="${t && typeof t.freeKm === 'number' ? t.freeKm : 100}" /></div>
           <div><label>Cor</label><input type="color" id="f_color" value="${t ? t.color : '#7c3aed'}" /></div>
           <div><label>Latitude</label><input type="number" id="f_lat" step="0.00001" value="${t ? t.lat : ''}" /></div>
           <div><label>Longitude</label><input type="number" id="f_lng" step="0.00001" value="${t ? t.lng : ''}" /></div>
@@ -1016,10 +1018,12 @@
     const color = document.getElementById('f_color').value;
     const lat = parseFloat(document.getElementById('f_lat').value);
     const lng = parseFloat(document.getElementById('f_lng').value);
-    if (!name || !origin || !isFinite(rate) || !isFinite(lat) || !isFinite(lng)) {
+    const freeKmRaw = document.getElementById('f_freeKm').value;
+    const freeKm = freeKmRaw === '' ? FREE_KM : parseFloat(freeKmRaw);
+    if (!name || !origin || !isFinite(rate) || !isFinite(lat) || !isFinite(lng) || !isFinite(freeKm) || freeKm < 0) {
       alert('Preenche todos os campos.'); return;
     }
-    const payload = { name, origin, rate, color, lat, lng };
+    const payload = { name, origin, rate, color, lat, lng, freeKm };
     try {
       if (editingId) {
         let updated;

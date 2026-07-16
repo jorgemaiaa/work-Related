@@ -48,6 +48,10 @@ export async function onRequestPatch({ request, env, params }) {
     if (typeof body.lng !== 'number' || !isFinite(body.lng)) return new Response('invalid lng', { status: 400 });
     next.lng = body.lng;
   }
+  if (body.freeKm !== undefined) {
+    if (typeof body.freeKm !== 'number' || !isFinite(body.freeKm) || body.freeKm < 0) return new Response('invalid freeKm', { status: 400 });
+    next.freeKm = body.freeKm;
+  }
   list[idx] = next;
   await writeAll(env, list);
   return Response.json({ installer: next });

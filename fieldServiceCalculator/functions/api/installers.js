@@ -34,6 +34,7 @@ function validate(body) {
   if (typeof body.color !== 'string' || !body.color) return 'invalid color';
   if (typeof body.lat !== 'number' || !isFinite(body.lat)) return 'invalid lat';
   if (typeof body.lng !== 'number' || !isFinite(body.lng)) return 'invalid lng';
+  if (body.freeKm != null && (typeof body.freeKm !== 'number' || !isFinite(body.freeKm) || body.freeKm < 0)) return 'invalid freeKm';
   return null;
 }
 function newId() {
@@ -59,6 +60,7 @@ export async function onRequestPost({ request, env }) {
     color: body.color,
     lat: body.lat,
     lng: body.lng,
+    freeKm: typeof body.freeKm === 'number' ? body.freeKm : 100,
   };
   const list = await readAll(env);
   list.push(installer);
