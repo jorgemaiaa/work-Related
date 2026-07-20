@@ -388,6 +388,9 @@
   .day-cell:hover { background: #f8fafc; }
   .day-cell.other-month { background: #fafafa; color: #c0c5cd; }
   .day-cell.other-month:hover { background: #f4f4f5; }
+  .day-cell.day-off { background: #fef9c3; }
+  .day-cell.day-off:hover { background: #fef08a; }
+  .day-cell.day-off.other-month { background: #fdf6b8; color: #a3a5a0; }
   .day-cell.today .day-num {
     background: var(--accent);
     color: #fff;
@@ -1351,6 +1354,52 @@
 
   const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
+  // --- Portuguese national holidays ---
+  function easterSunday(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31); // 3=March, 4=April
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+  const holidaysCache = new Map();
+  function getHolidays(year) {
+    if (holidaysCache.has(year)) return holidaysCache.get(year);
+    const easter = easterSunday(year);
+    const goodFriday = new Date(easter); goodFriday.setDate(easter.getDate() - 2);
+    const corpusChristi = new Date(easter); corpusChristi.setDate(easter.getDate() + 60);
+    const items = [
+      [new Date(year, 0, 1),  'Ano Novo'],
+      [goodFriday,            'Sexta-feira Santa'],
+      [new Date(easter),      'Domingo de Páscoa'],
+      [new Date(year, 3, 25), 'Dia da Liberdade'],
+      [new Date(year, 4, 1),  'Dia do Trabalhador'],
+      [corpusChristi,         'Corpo de Deus'],
+      [new Date(year, 5, 10), 'Dia de Portugal'],
+      [new Date(year, 7, 15), 'Assunção de Nossa Senhora'],
+      [new Date(year, 9, 5),  'Implantação da República'],
+      [new Date(year, 10, 1), 'Dia de Todos os Santos'],
+      [new Date(year, 11, 1), 'Restauração da Independência'],
+      [new Date(year, 11, 8), 'Imaculada Conceição'],
+      [new Date(year, 11, 25),'Natal'],
+    ];
+    const map = new Map(items.map(([d, name]) => [dateKey(d), name]));
+    holidaysCache.set(year, map);
+    return map;
+  }
+  function holidayName(date) { return getHolidays(date.getFullYear()).get(dateKey(date)) || null; }
+  function isWeekend(date) { const d = date.getDay(); return d === 0 || d === 6; }
+
   function renderCalendar() {
     renderLegend();
     const label = document.getElementById('monthLabel');
@@ -1377,6 +1426,9 @@
       if (isOther) cell.classList.add('other-month');
       if (key === todayKey) cell.classList.add('today');
       if (key === selectedDate) cell.classList.add('selected');
+      const hName = holidayName(cellDate);
+      if (isWeekend(cellDate) || hName) cell.classList.add('day-off');
+      if (hName) cell.title = hName;
       cell.dataset.date = key;
 
       const recs = (recsByDay.get(key) || []).slice().sort((a, b) => a.datetime.localeCompare(b.datetime));
