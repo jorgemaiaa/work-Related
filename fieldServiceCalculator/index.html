@@ -610,6 +610,7 @@
   const FILTER_KEY = 'agenda.filter.protocols';
   const PT_BOUNDS = L.latLngBounds([36.8, -9.6], [42.2, -6.1]);
   const FREE_KM = 100;
+  const MAX_COST_EUR = 300;
   const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
   const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
 
@@ -829,6 +830,7 @@
           iconSize: [14, 14], iconAnchor: [7, 7],
         });
         m.setIcon(icon);
+        m.setOpacity(1);
       }
     }
   }
@@ -851,18 +853,38 @@
         return { ...p, error: err.message || 'Erro' };
       }
     }));
-    const okResults = computed.filter(r => !r.error);
+    // Drop installers whose cost exceeds MAX_COST_EUR: no list entry, no
+    // route line, no map pin. Errors stay visible (unknown cost).
+    const hidden = computed.filter(r => !r.error && r.cost > MAX_COST_EUR);
+    const visible = computed.filter(r => r.error || r.cost <= MAX_COST_EUR);
+    for (const h of hidden) {
+      h.el.remove();
+      const m = installerMarkers.get(h.t.id);
+      if (m) m.setOpacity(0);
+    }
+    for (const v of visible) {
+      const m = installerMarkers.get(v.t.id);
+      if (m) m.setOpacity(1);
+    }
+
+    const okResults = visible.filter(r => !r.error);
     const bestCost = okResults.length ? Math.min(...okResults.map(r => r.cost)) : Infinity;
-    computed.sort((a, b) => {
+    visible.sort((a, b) => {
       if (a.error && !b.error) return 1;
       if (!a.error && b.error) return -1;
       if (a.error && b.error) return 0;
       return a.cost - b.cost;
     });
-    for (const r of computed) {
+    for (const r of visible) {
       results.appendChild(r.el);
       renderResult(r, !r.error && r.cost === bestCost);
       if (!r.error) drawRoute(r.t, r.route.geometry, r.cost === bestCost);
+    }
+    if (!visible.length) {
+      const empty = document.createElement('div');
+      empty.className = 'result';
+      empty.innerHTML = `<div></div><div class="meta">Nenhum instalador com custo ≤ ${MAX_COST_EUR} €.</div><div></div>`;
+      results.appendChild(empty);
     }
     updateBestMarker(okResults, bestCost);
   }
