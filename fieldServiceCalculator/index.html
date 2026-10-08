@@ -532,6 +532,15 @@
   .matrix-scroll { overflow-x: auto; }
   .matrix th .swatch { display: inline-block; vertical-align: middle; margin-right: 4px; }
   .matrix input[type="number"] { width: 72px; }
+  .matrix { border-collapse: separate; border-spacing: 0; }
+  .matrix th:first-child, .matrix td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--panel);
+    min-width: 170px;
+    box-shadow: 1px 0 0 var(--border);
+  }
 
   @media (max-width: 720px) {
     .costs-wrap { grid-template-columns: 1fr; padding: 12px; }
