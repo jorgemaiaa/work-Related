@@ -501,7 +501,40 @@
   }
   .auth-banner a { color: #78350f; font-weight: 600; }
 
+  /* ---------- Custos ---------- */
+  #tab-costs { overflow-y: auto; }
+  .costs-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+    max-width: 1300px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+  .card h2 { margin-top: 0; }
+  .costs-wrap .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .cost-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  .cost-table th, .cost-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+  .cost-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+  .cost-table .num { text-align: right; white-space: nowrap; }
+  .cost-table input[type="number"] { width: 80px; text-align: right; padding: 5px 7px; }
+  .cost-table tfoot td { font-weight: 700; font-size: 15px; border-bottom: none; padding-top: 10px; }
+  .cost-table .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .matrix-scroll { overflow-x: auto; }
+  .matrix th .swatch { display: inline-block; vertical-align: middle; margin-right: 4px; }
+  .matrix input[type="number"] { width: 72px; }
+
   @media (max-width: 720px) {
+    .costs-wrap { grid-template-columns: 1fr; padding: 12px; }
     #tab-calc { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     #tab-agenda.day-open { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
     #sidebar { max-height: 50vh; }
@@ -514,6 +547,7 @@
   <header id="tabbar">
     <button data-tab="calc" class="active">Calculadora</button>
     <button data-tab="agenda">Agenda</button>
+    <button data-tab="costs">Custos</button>
     <div class="spacer"></div>
     <button id="logoutBtn" class="ghost tiny" style="margin-right:8px;">Sair</button>
   </header>
@@ -582,6 +616,50 @@
             <button id="addRecordBtn" class="primary">+ Novo agendamento</button>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <!-- ===== Custos tab ===== -->
+    <section id="tab-costs" class="tab" hidden>
+      <div class="costs-wrap">
+        <div class="card">
+          <h2>Orçamento</h2>
+          <div class="form-grid">
+            <div class="full"><label>Instalador</label><select id="q_installer"></select></div>
+            <div class="full">
+              <label>Local do trabalho</label>
+              <div class="search-row">
+                <input type="text" id="q_address" placeholder="Procurar morada em Portugal…" autocomplete="off" />
+                <button id="q_search" class="primary">Procurar</button>
+              </div>
+              <div class="meta" id="q_jobLabel"></div>
+            </div>
+          </div>
+          <table class="cost-table">
+            <thead>
+              <tr><th>Produto</th><th class="num">Preço</th><th class="num">Qtd</th><th class="num">Subtotal</th></tr>
+            </thead>
+            <tbody id="q_rows"></tbody>
+            <tfoot>
+              <tr><td colspan="3">Total</td><td class="num" id="q_total">0,00 €</td></tr>
+            </tfoot>
+          </table>
+          <div class="actions-row">
+            <button id="q_clear" class="ghost">Limpar quantidades</button>
+            <button id="q_copy" class="primary">Copiar resumo</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Tabela de preços (€)</h2>
+          <div class="matrix-scroll">
+            <table class="cost-table matrix" id="p_matrix"></table>
+          </div>
+          <div class="meta" id="p_status"></div>
+          <div class="actions-row">
+            <button id="p_save" class="primary">Guardar preços</button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -655,6 +733,10 @@
 
   let technicians = loadTechnicians();
   let job = null;
+  let computeSeq = 0;
+  const travelCosts = new Map();      // installerId -> last calculator result for the current job
+  let prices = {};                    // { [installerId]: { [productId]: number } }
+  const quoteQty = {};                // { [productId]: number }
   let pickingTarget = null;
   let editingId = null;
 
@@ -818,6 +900,9 @@
     routeLayers.clear();
   }
   function clearResults() {
+    computeSeq++;
+    travelCosts.clear();
+    renderQuote();
     document.getElementById('results').innerHTML =
       '<div class="result"><div></div><div class="meta">Define o local do trabalho para calcular custos.</div><div></div></div>';
     clearRoutes();
@@ -836,6 +921,9 @@
   }
   async function computeAll() {
     if (!job) return;
+    const seq = ++computeSeq;
+    travelCosts.clear();
+    renderQuote();
     clearRoutes();
     const results = document.getElementById('results');
     results.innerHTML = '';
@@ -853,6 +941,10 @@
         return { ...p, error: err.message || 'Erro' };
       }
     }));
+    if (seq !== computeSeq) return; // a newer job location superseded this run
+    // Remember every installer's travel cost (even ones hidden below) for the Custos tab.
+    for (const r of computed) travelCosts.set(r.t.id, r);
+    renderQuote();
     // Drop installers whose cost exceeds MAX_COST_EUR: no list entry, no
     // route line, no map pin. Errors stay visible (unknown cost).
     const hidden = computed.filter(r => !r.error && r.cost > MAX_COST_EUR);
@@ -1102,6 +1194,9 @@
   function refreshAllCalc() {
     renderInstallerList();
     renderInstallerMarkers();
+    renderQuoteInstallerSelect();
+    renderPriceMatrix();
+    renderQuote();
     if (job) computeAll();
   }
 
@@ -1121,12 +1216,250 @@
     });
     document.getElementById('tab-calc').hidden = name !== 'calc';
     document.getElementById('tab-agenda').hidden = name !== 'agenda';
+    document.getElementById('tab-costs').hidden = name !== 'costs';
     if (name === 'calc') {
       setTimeout(() => map.invalidateSize(), 0);
     } else if (name === 'agenda') {
       ensureAgendaLoaded();
+    } else if (name === 'costs') {
+      ensureCostsLoaded();
     }
   }
+
+  // ============================================================
+  // Custos — price table + quote builder
+  // ============================================================
+  const PRODUCTS = [
+    { id: 'pack_mono',  name: 'Pack base monofásico',   unit: 'un' },
+    { id: 'pack_tri',   name: 'Pack base trifásico',    unit: 'un' },
+    { id: 'cabo_mono',  name: 'Metro cabo monofásico',  unit: 'm'  },
+    { id: 'cabo_tri',   name: 'Metro cabo trifásico',   unit: 'm'  },
+    { id: 'quadro',     name: 'Quadro elétrico',        unit: 'un' },
+    { id: 'visita',     name: 'Visita técnica',         unit: 'un' },
+    { id: 'fixacao',    name: 'Fixação & configuração', unit: 'un' },
+  ];
+  const PRICES_CACHE_KEY = 'prices.v1.cache';
+  let costsLoaded = false;
+  let pricesMode = 'unknown'; // 'api' | 'local'
+
+  function formatEur(v) {
+    return v.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+  function priceOf(installerId, productId) {
+    const v = prices[installerId] && prices[installerId][productId];
+    return typeof v === 'number' && isFinite(v) ? v : 0;
+  }
+
+  async function ensureCostsLoaded() {
+    renderQuoteInstallerSelect();
+    renderPriceMatrix();
+    renderQuote();
+    if (costsLoaded) return;
+    costsLoaded = true;
+    try {
+      const r = await apiRequest('/api/prices');
+      if (!r.ok) throw new Error('GET /api/prices ' + r.status);
+      prices = (await r.json()).prices || {};
+      pricesMode = 'api';
+      localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices));
+      setPriceStatus('');
+    } catch (e) {
+      if (e.code === 'auth') { costsLoaded = false; return; }
+      pricesMode = 'local';
+      try { prices = JSON.parse(localStorage.getItem(PRICES_CACHE_KEY) || '{}') || {}; } catch (_) { prices = {}; }
+      setPriceStatus('⚠️ Backend indisponível — preços guardados apenas neste browser.');
+    }
+    renderPriceMatrix();
+    renderQuote();
+  }
+  function setPriceStatus(msg) { document.getElementById('p_status').textContent = msg; }
+
+  // ---- Price matrix ----
+  function renderPriceMatrix() {
+    const table = document.getElementById('p_matrix');
+    if (!technicians.length) {
+      table.innerHTML = '<tr><td class="meta">Sem instaladores. Adiciona-os na tab Calculadora.</td></tr>';
+      return;
+    }
+    const head = '<thead><tr><th>Produto</th>' + technicians.map(t =>
+      `<th class="num"><span class="swatch" style="background:${t.color}"></span>${escapeHtml(t.name)}</th>`
+    ).join('') + '</tr></thead>';
+    const body = '<tbody>' + PRODUCTS.map(p =>
+      `<tr><td>${escapeHtml(p.name)} <span class="sub">€ / ${p.unit}</span></td>` +
+      technicians.map(t =>
+        `<td class="num"><input type="number" min="0" step="0.01" data-inst="${escapeAttr(t.id)}" data-prod="${p.id}" value="${prices[t.id] && typeof prices[t.id][p.id] === 'number' ? prices[t.id][p.id] : ''}" placeholder="0" /></td>`
+      ).join('') + '</tr>'
+    ).join('') +
+      `<tr><td>Deslocação <span class="sub">calculada (€/km + km grátis)</span></td>` +
+      technicians.map(t => `<td class="num"><span class="sub">${formatRate(t.rate)} €/km · ${typeof t.freeKm === 'number' ? t.freeKm : FREE_KM} km</span></td>`).join('') +
+      '</tr></tbody>';
+    table.innerHTML = head + body;
+  }
+  function readPriceMatrix() {
+    const next = {};
+    for (const inp of document.querySelectorAll('#p_matrix input[data-inst]')) {
+      const raw = inp.value.trim();
+      if (raw === '') continue;
+      const v = parseFloat(raw.replace(',', '.'));
+      if (!isFinite(v) || v < 0) throw new Error('Preço inválido: ' + raw);
+      (next[inp.dataset.inst] ||= {})[inp.dataset.prod] = v;
+    }
+    return next;
+  }
+  document.getElementById('p_save').addEventListener('click', async () => {
+    let next;
+    try { next = readPriceMatrix(); }
+    catch (e) { alert(e.message); return; }
+    const btn = document.getElementById('p_save');
+    btn.disabled = true;
+    try {
+      if (pricesMode !== 'local') {
+        try {
+          const r = await apiRequest('/api/prices', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prices: next }),
+          });
+          if (!r.ok) throw new Error('PUT /api/prices ' + r.status);
+          pricesMode = 'api';
+        } catch (e) {
+          if (e.code === 'no-backend' || e.code === 'network') pricesMode = 'local';
+          else throw e;
+        }
+      }
+      prices = next;
+      localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices));
+      setPriceStatus(pricesMode === 'api'
+        ? 'Preços guardados ✓'
+        : '⚠️ Backend indisponível — preços guardados apenas neste browser.');
+      renderQuote();
+    } catch (e) {
+      if (e.code !== 'auth') alert('Erro ao guardar preços: ' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ---- Quote builder ----
+  function renderQuoteInstallerSelect() {
+    const sel = document.getElementById('q_installer');
+    const current = sel.value;
+    sel.innerHTML = technicians.map(t =>
+      `<option value="${escapeAttr(t.id)}">${escapeHtml(t.name)} — ${escapeHtml(t.origin)}</option>`
+    ).join('');
+    if (technicians.some(t => t.id === current)) sel.value = current;
+  }
+
+  function travelLine(installerId) {
+    if (!job) return { cost: 0, note: 'Define o local do trabalho' };
+    const r = travelCosts.get(installerId);
+    if (!r) return { cost: 0, note: 'A calcular…' };
+    if (r.error) return { cost: 0, note: 'Erro na rota: ' + r.error };
+    if (r.free) return { cost: 0, note: `Grátis · ${r.roundKm.toFixed(1)} km ida e volta` };
+    return { cost: r.cost, note: `${r.billableKm.toFixed(1)} km × ${formatRate(r.t.rate)} €/km (após ${r.freeKm} km)` };
+  }
+
+  function renderQuote() {
+    const tbody = document.getElementById('q_rows');
+    if (!tbody) return;
+    const installerId = document.getElementById('q_installer').value;
+
+    const jobLabel = document.getElementById('q_jobLabel');
+    jobLabel.textContent = job
+      ? (job.label || `${job.lat.toFixed(5)}, ${job.lng.toFixed(5)}`) + ' (partilhado com a Calculadora)'
+      : 'Sem local definido — procura uma morada ou escolhe no mapa da Calculadora.';
+
+    // Keep focus/caret stable: only rebuild rows when the structure changes.
+    if (tbody.children.length !== PRODUCTS.length + 1) {
+      tbody.innerHTML = PRODUCTS.map(p => `
+        <tr data-prod="${p.id}">
+          <td>${escapeHtml(p.name)}</td>
+          <td class="num" data-cell="price"></td>
+          <td class="num"><input type="number" min="0" step="${p.unit === 'm' ? '0.5' : '1'}" data-qty="${p.id}" placeholder="0" /></td>
+          <td class="num" data-cell="sub"></td>
+        </tr>`).join('') + `
+        <tr data-prod="desloc">
+          <td>Deslocação<span class="sub" data-cell="note"></span></td>
+          <td class="num">—</td>
+          <td class="num">1</td>
+          <td class="num" data-cell="sub"></td>
+        </tr>`;
+      tbody.querySelectorAll('input[data-qty]').forEach(inp => {
+        inp.value = quoteQty[inp.dataset.qty] || '';
+        inp.addEventListener('input', () => {
+          const v = parseFloat(inp.value.replace(',', '.'));
+          quoteQty[inp.dataset.qty] = isFinite(v) && v > 0 ? v : 0;
+          renderQuote();
+        });
+      });
+    }
+
+    let total = 0;
+    for (const p of PRODUCTS) {
+      const row = tbody.querySelector(`tr[data-prod="${p.id}"]`);
+      const unit = priceOf(installerId, p.id);
+      const qty = quoteQty[p.id] || 0;
+      const sub = unit * qty;
+      total += sub;
+      row.querySelector('[data-cell="price"]').textContent = formatEur(unit) + ' / ' + p.unit;
+      row.querySelector('[data-cell="sub"]').textContent = qty ? formatEur(sub) : '—';
+    }
+    const t = travelLine(installerId);
+    total += t.cost;
+    const dRow = tbody.querySelector('tr[data-prod="desloc"]');
+    dRow.querySelector('[data-cell="note"]').textContent = t.note;
+    dRow.querySelector('[data-cell="sub"]').textContent = formatEur(t.cost);
+    document.getElementById('q_total').textContent = formatEur(total);
+  }
+
+  document.getElementById('q_installer').addEventListener('change', renderQuote);
+  document.getElementById('q_clear').addEventListener('click', () => {
+    for (const k of Object.keys(quoteQty)) delete quoteQty[k];
+    document.querySelectorAll('#q_rows input[data-qty]').forEach(i => { i.value = ''; });
+    renderQuote();
+  });
+  async function quoteSearch() {
+    const q = document.getElementById('q_address').value.trim();
+    if (!q) return;
+    try {
+      const hit = await searchAddress(q);
+      setJob(hit);
+      map.setView([hit.lat, hit.lng], 13);
+    } catch (e) {
+      alert('Não foi possível encontrar essa morada: ' + e.message);
+    }
+  }
+  document.getElementById('q_search').addEventListener('click', quoteSearch);
+  document.getElementById('q_address').addEventListener('keydown', (e) => { if (e.key === 'Enter') quoteSearch(); });
+
+  document.getElementById('q_copy').addEventListener('click', async () => {
+    const installerId = document.getElementById('q_installer').value;
+    const inst = technicians.find(x => x.id === installerId);
+    const lines = [`Orçamento — ${inst ? inst.name : '?'}`];
+    if (job) lines.push(`Local: ${job.label || `${job.lat.toFixed(5)}, ${job.lng.toFixed(5)}`}`);
+    let total = 0;
+    for (const p of PRODUCTS) {
+      const qty = quoteQty[p.id] || 0;
+      if (!qty) continue;
+      const sub = priceOf(installerId, p.id) * qty;
+      total += sub;
+      lines.push(`- ${p.name}: ${qty} ${p.unit} × ${formatEur(priceOf(installerId, p.id))} = ${formatEur(sub)}`);
+    }
+    const t = travelLine(installerId);
+    total += t.cost;
+    lines.push(`- Deslocação: ${formatEur(t.cost)} (${t.note})`);
+    lines.push(`Total: ${formatEur(total)}`);
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('q_copy');
+      const old = btn.textContent;
+      btn.textContent = 'Copiado ✓';
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    } catch (e) {
+      prompt('Copia o resumo:', text);
+    }
+  });
 
   // ============================================================
   // Agenda — API client (with shared-password login on 401)

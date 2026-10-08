@@ -4,6 +4,7 @@ App web single-page com dois separadores:
 
 1. **Calculadora** — custo de deslocação de instaladores em Portugal continental.
 2. **Agenda** — calendário mensal de agendamentos (instalação / visita técnica / pós-venda).
+3. **Custos** — tabela de preços por instalador e construtor de orçamentos.
 
 Toda a aplicação está protegida por uma palavra-passe partilhada — quem chega ao URL sem cookie de sessão vê um ecrã de login antes de qualquer conteúdo.
 
@@ -66,6 +67,14 @@ Se a Agenda for usada fora do backend (deploy ainda não feito, sem rede, GH Pag
 
 ---
 
+## Custos
+
+- **Tabela de preços**: um preço por produto e por instalador (pack base mono/trifásico, metro de cabo mono/trifásico, quadro elétrico, visita técnica, fixação & configuração). Guardada em KV (chave `prices`), partilhada por toda a equipa.
+- **Orçamento**: escolhe o instalador, o local e as quantidades. A deslocação vem da Calculadora (mesma regra de km grátis + €/km) — o local é partilhado entre as duas tabs.
+- **Copiar resumo** copia o orçamento em texto para colar num email/mensagem.
+
+---
+
 ## Estrutura do repositório
 
 ```
@@ -76,6 +85,7 @@ fieldServiceCalculator/
     ├── _middleware.js            # gates the whole site, serves login page
     └── api/
         ├── auth.js               # POST /api/auth (login) + DELETE (logout)
+        ├── prices.js             # GET + PUT   /api/prices
         ├── schedules.js          # GET + POST  /api/schedules
         └── schedules/
             └── [id].js           # PATCH + DELETE /api/schedules/:id
