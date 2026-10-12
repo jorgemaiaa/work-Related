@@ -531,6 +531,21 @@
   .cost-table tfoot td { font-weight: 700; font-size: 15px; border-bottom: none; padding-top: 10px; }
   .cost-table .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
   .matrix-scroll { overflow-x: auto; }
+  .suggest {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .suggest.better { background: var(--good-soft); border-color: #86efac; }
+  .suggest .msg { flex: 1; min-width: 200px; }
+  .suggest .excl { flex-basis: 100%; font-size: 11px; color: var(--muted); }
   .matrix th .swatch { display: inline-block; vertical-align: middle; margin-right: 4px; }
   .matrix input[type="number"] { width: 72px; }
   .cost-table input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
@@ -648,7 +663,10 @@
         <div class="card">
           <h2>Orçamento</h2>
           <div class="form-grid">
-            <div class="full"><label>Instalador</label><select id="q_installer"></select></div>
+            <div class="full">
+              <label>Instalador</label><select id="q_installer"></select>
+              <div id="q_suggest" class="suggest" hidden></div>
+            </div>
             <div class="full">
               <label>Local do trabalho</label>
               <div class="search-row">
@@ -1448,7 +1466,81 @@
     dRow.querySelector('[data-cell="note"]').textContent = t.note;
     dRow.querySelector('[data-cell="sub"]').textContent = formatEur(t.cost);
     document.getElementById('q_total').textContent = formatEur(total);
+    renderSuggestion();
   }
+
+  // Total for one installer with the current quantities + travel.
+  // An installer with no price (0/empty) for a product that has a quantity
+  // can't be compared fairly, so it's flagged as missing.
+  function quoteTotalFor(installerId) {
+    let total = 0;
+    const missing = [];
+    for (const p of PRODUCTS) {
+      const qty = quoteQty[p.id] || 0;
+      if (!qty) continue;
+      const unit = priceOf(installerId, p.id);
+      if (unit <= 0) missing.push(p.name);
+      total += unit * qty;
+    }
+    let travelState = 'ok';
+    if (job) {
+      const r = travelCosts.get(installerId);
+      if (!r) travelState = 'pending';
+      else if (r.error) travelState = 'error';
+      else total += r.cost;
+    }
+    return { total, missing, travelState };
+  }
+
+  function renderSuggestion() {
+    const box = document.getElementById('q_suggest');
+    const hasQty = PRODUCTS.some(p => (quoteQty[p.id] || 0) > 0);
+    if (!technicians.length || (!hasQty && !job)) { box.hidden = true; return; }
+    box.hidden = false;
+    box.classList.remove('better');
+
+    const rows = technicians.map(t => ({ t, ...quoteTotalFor(t.id) }));
+    if (rows.some(r => r.travelState === 'pending')) {
+      box.innerHTML = '<span class="msg">A calcular deslocações…</span>';
+      return;
+    }
+    const eligible = rows.filter(r => !r.missing.length && r.travelState === 'ok');
+    const excluded = rows.filter(r => r.missing.length || r.travelState !== 'ok');
+    const exclHtml = excluded.length
+      ? `<span class="excl">Não comparados: ${excluded.map(r =>
+          `${escapeHtml(r.t.name)} (${r.travelState === 'error' ? 'erro na rota' : 'sem preço: ' + escapeHtml(r.missing.join(', '))})`
+        ).join('; ')}</span>`
+      : '';
+    if (!eligible.length) {
+      box.innerHTML = `<span class="msg">Nenhum instalador tem preço para todos os produtos escolhidos.</span>${exclHtml}`;
+      return;
+    }
+
+    const best = Math.min(...eligible.map(r => r.total));
+    const cheapest = eligible.filter(r => r.total - best < 0.005);
+    const selectedId = document.getElementById('q_installer').value;
+    const selected = rows.find(r => r.t.id === selectedId);
+    const names = cheapest.map(r => escapeHtml(r.t.name)).join(' / ');
+
+    if (cheapest.some(r => r.t.id === selectedId)) {
+      const others = cheapest.filter(r => r.t.id !== selectedId);
+      box.innerHTML = `<span class="msg">✓ O instalador selecionado é o mais barato (${formatEur(best)})` +
+        (others.length ? `, empatado com ${others.map(r => escapeHtml(r.t.name)).join(' / ')}` : '') +
+        `.</span>${exclHtml}`;
+      return;
+    }
+    const comparable = selected && !selected.missing.length && selected.travelState === 'ok';
+    const saving = comparable ? ` — poupa ${formatEur(selected.total - best)} face ao selecionado` : '';
+    box.classList.add('better');
+    box.innerHTML = `<span class="msg">💡 Mais barato: <b>${names}</b> — ${formatEur(best)}${saving}</span>` +
+      `<button class="tiny primary" data-use="${escapeAttr(cheapest[0].t.id)}">Usar</button>${exclHtml}`;
+  }
+  document.getElementById('q_suggest').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-use]');
+    if (!btn) return;
+    document.getElementById('q_installer').value = btn.dataset.use;
+    renderQuote();
+  });
 
   document.getElementById('q_installer').addEventListener('change', renderQuote);
   document.getElementById('q_clear').addEventListener('click', () => {
