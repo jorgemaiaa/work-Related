@@ -1,0 +1,14 @@
+{
+  "descricao": "Box com quadro próprio: pede a distância e a foto do quadro da box, não do quadro da habitação",
+  "mensagens": [
+    { "texto": "Olá. Moro num apartamento no 5.º andar e tenho uma box fechada na cave -1 do prédio." },
+    { "texto": "Dentro da box já há um quadro elétrico pequeno, ligado ao quadro da minha casa." },
+    { "texto": "O carregador ficaria na parede ao lado desse quadro, a uns 2 metros." }
+  ],
+  "esperado": {
+    "estado": "em_recolha",
+    "ficha": { "tipo_estacionamento": "box_fechada_condominio", "quadro_no_estacionamento": "sim", "distancia_quadro_estacionamento_m": 2 },
+    "em_falta_contem": ["anexo:quadro_estacionamento"],
+    "em_falta_nao_contem": ["andar_quadro", "distancia_declarada_m", "percurso_descricao", "anexo:quadro_aberto", "quadro_no_estacionamento"]
+  }
+}

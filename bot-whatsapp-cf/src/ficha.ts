@@ -59,6 +59,16 @@ export const CAMPOS: Record<string, EsquemaCampo> = {
     enum: ["sim", "nao", "nao_sabe"],
     description: "Se existe quadro dos serviços comuns do condomínio perto do lugar.",
   },
+  quadro_no_estacionamento: {
+    type: "string",
+    enum: ["sim", "nao", "nao_sabe"],
+    description:
+      "Se existe um quadro elétrico próprio (sub-quadro, ligado ao quadro da habitação) dentro da box ou junto ao lugar do carro. Não confundir com o quadro dos serviços comuns do condomínio.",
+  },
+  distancia_quadro_estacionamento_m: {
+    type: "number",
+    description: "Distância em metros entre o quadro da box (ou junto ao lugar) e o local do carregador.",
+  },
   prazo: {
     type: "string",
     description: "Prazo ou urgência indicada pelo cliente (ex.: 'tem de ficar instalado em 2026').",
@@ -75,6 +85,7 @@ const LIMITES: Record<string, [number, number]> = {
   andar_quadro: [-6, 60],
   piso_estacionamento: [-6, 60],
   distancia_declarada_m: [0, 300],
+  distancia_quadro_estacionamento_m: [0, 100],
 };
 
 const OBRIGATORIOS = [
@@ -89,6 +100,10 @@ const OBRIGATORIOS = [
 
 const ESTACIONAMENTO_CONDOMINIO = new Set(["box_fechada_condominio", "lugar_aberto_condominio"]);
 
+// Com quadro na box, a alimentação do carregador parte desse quadro: o piso, a distância e o
+// percurso desde o quadro da habitação (e a foto dele) deixam de ser obrigatórios.
+const SO_SEM_QUADRO_NO_ESTACIONAMENTO = new Set(["andar_quadro", "distancia_declarada_m", "percurso_descricao"]);
+
 export const CATEGORIAS_ANEXO = [
   "quadro_aberto",
   "disjuntor_entrada",
@@ -96,9 +111,11 @@ export const CATEGORIAS_ANEXO = [
   "percurso",
   "fatura_eletricidade",
   "quadro_servicos_comuns",
+  "quadro_estacionamento",
   "outra",
 ];
 const ANEXOS_OBRIGATORIOS = ["quadro_aberto", "local_carregador", "fatura_eletricidade"];
+const ANEXOS_OBRIGATORIOS_COM_QUADRO_NO_ESTACIONAMENTO = ["quadro_estacionamento", "local_carregador", "fatura_eletricidade"];
 
 const ALTURA_PISO_M = 3;
 
@@ -144,11 +161,21 @@ export function validar(dados: Record<string, unknown>): { validos: Ficha; erros
 }
 
 export function camposEmFalta(ficha: Ficha, anexosValidos: Set<string>): string[] {
-  const falta = OBRIGATORIOS.filter((c) => ficha[c] === undefined || ficha[c] === "");
+  const vazio = (c: string) => ficha[c] === undefined || ficha[c] === "";
+  const quadroNoEstacionamento = ficha.quadro_no_estacionamento === "sim";
+  const obrigatorios = quadroNoEstacionamento
+    ? OBRIGATORIOS.filter((c) => !SO_SEM_QUADRO_NO_ESTACIONAMENTO.has(c))
+    : OBRIGATORIOS;
+  const falta = obrigatorios.filter(vazio);
+  if (ficha.tipo_estacionamento === "box_fechada_condominio" && vazio("quadro_no_estacionamento")) {
+    falta.push("quadro_no_estacionamento");
+  }
+  if (quadroNoEstacionamento && vazio("distancia_quadro_estacionamento_m")) falta.push("distancia_quadro_estacionamento_m");
   if (ESTACIONAMENTO_CONDOMINIO.has(String(ficha.tipo_estacionamento)) && !ficha.quadro_servicos_comuns) {
     falta.push("quadro_servicos_comuns");
   }
-  for (const a of ANEXOS_OBRIGATORIOS) if (!anexosValidos.has(a)) falta.push(`anexo:${a}`);
+  const anexos = quadroNoEstacionamento ? ANEXOS_OBRIGATORIOS_COM_QUADRO_NO_ESTACIONAMENTO : ANEXOS_OBRIGATORIOS;
+  for (const a of anexos) if (!anexosValidos.has(a)) falta.push(`anexo:${a}`);
   return falta;
 }
 

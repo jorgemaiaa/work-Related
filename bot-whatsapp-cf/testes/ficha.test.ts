@@ -95,6 +95,7 @@ describe("validar", () => {
     expect(validar({ andar_quadro: 60 }).validos).toEqual({ andar_quadro: 60 });
     expect(validar({ andar_quadro: -7 }).erros[0]).toContain("fora do intervalo");
     expect(validar({ distancia_declarada_m: 301 }).erros[0]).toContain("fora do intervalo");
+    expect(validar({ distancia_quadro_estacionamento_m: 101 }).erros[0]).toContain("fora do intervalo");
     expect(validar({ potencia_contratada_kva: 0.5 }).erros[0]).toContain("fora do intervalo");
   });
 
@@ -132,10 +133,39 @@ describe("camposEmFalta", () => {
 
   it("exige quadro_servicos_comuns em estacionamento de condomínio", () => {
     for (const tipo of ["box_fechada_condominio", "lugar_aberto_condominio"]) {
-      const ficha = fichaCompleta({ tipo_imovel: "apartamento", tipo_estacionamento: tipo });
+      // quadro_no_estacionamento respondido, para isolar a regra do quadro dos serviços comuns
+      const ficha = fichaCompleta({ tipo_imovel: "apartamento", tipo_estacionamento: tipo, quadro_no_estacionamento: "nao" });
       expect(camposEmFalta(ficha, ANEXOS_COMPLETOS)).toEqual(["quadro_servicos_comuns"]);
       expect(camposEmFalta({ ...ficha, quadro_servicos_comuns: "nao_sabe" }, ANEXOS_COMPLETOS)).toEqual([]);
     }
+  });
+
+  it("box fechada: pergunta se há quadro na box", () => {
+    const ficha = fichaCompleta({ tipo_imovel: "apartamento", tipo_estacionamento: "box_fechada_condominio", quadro_servicos_comuns: "nao" });
+    expect(camposEmFalta(ficha, ANEXOS_COMPLETOS)).toEqual(["quadro_no_estacionamento"]);
+    expect(camposEmFalta({ ...ficha, quadro_no_estacionamento: "nao" }, ANEXOS_COMPLETOS)).toEqual([]);
+  });
+
+  it("com quadro na box: dispensa os dados do quadro da habitação e pede os da box", () => {
+    const ficha: Ficha = {
+      tipo_imovel: "apartamento",
+      tipo_estacionamento: "box_fechada_condominio",
+      quadro_servicos_comuns: "nao",
+      rede: "monofasica",
+      piso_estacionamento: -1,
+      quadro_no_estacionamento: "sim",
+    };
+    const anexos = new Set(["local_carregador", "fatura_eletricidade"]);
+    expect(camposEmFalta(ficha, anexos)).toEqual(["distancia_quadro_estacionamento_m", "anexo:quadro_estacionamento"]);
+    const completa = { ...ficha, distancia_quadro_estacionamento_m: 2 };
+    expect(camposEmFalta(completa, new Set([...anexos, "quadro_estacionamento"]))).toEqual([]);
+  });
+
+  it("quadro na box com 'nao_sabe' mantém os dados do quadro da habitação obrigatórios", () => {
+    const ficha = fichaCompleta({ quadro_no_estacionamento: "nao_sabe" });
+    expect(camposEmFalta(ficha, ANEXOS_COMPLETOS)).toEqual([]);
+    const { andar_quadro, ...semAndar } = ficha;
+    expect(camposEmFalta(semAndar, ANEXOS_COMPLETOS)).toEqual(["andar_quadro"]);
   });
 
   it("lista só os anexos obrigatórios em falta", () => {

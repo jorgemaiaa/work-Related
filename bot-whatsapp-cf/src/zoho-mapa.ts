@@ -31,6 +31,8 @@ const MAPA_FICHA: Record<string, string> = {
   distancia_declarada_m: "Distancia_ao_Quadro",
   percurso_descricao: "Percurso_do_Cabo",
   quadro_servicos_comuns: "Quadro_Servicos_Comuns",
+  quadro_no_estacionamento: "Quadro_no_Estacionamento",
+  distancia_quadro_estacionamento_m: "Distancia_Quadro_Estacionamento",
   prazo: "Prazo",
   observacoes: "Observacoes",
 };

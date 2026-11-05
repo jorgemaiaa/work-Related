@@ -27,7 +27,11 @@ export const FERRAMENTAS = [
         anexo_id: { type: "integer" },
         categoria: { type: "string", enum: F.CATEGORIAS_ANEXO },
         utilizavel: { type: "boolean" },
-        nota: { type: "string", description: "O que se vê, ou porque não é utilizável." },
+        nota: {
+          type: "string",
+          description:
+            "O que se vê, ou porque não é utilizável. Para quadro_aberto, quadro_estacionamento e quadro_servicos_comuns, descreve o aparelho geral e o diferencial: número de polos (módulos ligados pela mesma alavanca) e marcações legíveis (ex.: 'geral 2P 40 A, diferencial 2P 30 mA' ou 'geral 4P 400 V').",
+        },
       },
       required: ["anexo_id", "categoria", "utilizavel", "nota"],
       additionalProperties: false,
