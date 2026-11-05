@@ -189,7 +189,17 @@ function executarFerramenta(ctx: ContextoTurno, nome: string, dados: Record<stri
   return { erro: `ferramenta desconhecida: ${nome}` };
 }
 
-async function chamarClaude(env: Env, corpo: Record<string, unknown>): Promise<{ content: Bloco[]; stop_reason: string }> {
+interface Utilizacao {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+async function chamarClaude(
+  env: Env,
+  corpo: Record<string, unknown>,
+): Promise<{ content: Bloco[]; stop_reason: string; usage?: Utilizacao }> {
   const r = await fetch(`${env.ANTHROPIC_API_URL}/v1/messages`, {
     method: "POST",
     headers: {
@@ -233,6 +243,16 @@ export async function executarTurno(ctx: ContextoTurno, novas: LinhaMensagem[]):
       system: sistema,
       tools: FERRAMENTAS,
       messages: mensagens,
+    });
+    // cache_read_input_tokens > 0 a partir da 2.ª chamada confirma que o cache do prompt funciona
+    registar("claude_utilizacao", {
+      telefone: ctx.estado.telefone,
+      iteracao: i,
+      stop_reason: resp.stop_reason,
+      entrada: resp.usage?.input_tokens,
+      saida: resp.usage?.output_tokens,
+      cache_escrito: resp.usage?.cache_creation_input_tokens ?? 0,
+      cache_lido: resp.usage?.cache_read_input_tokens ?? 0,
     });
     mensagens.push({ role: "assistant", content: resp.content });
 
