@@ -18,7 +18,8 @@ Estado: **piloto em desenvolvimento**. O esqueleto funciona de ponta a ponta com
 ```bash
 npm run dev        # Worker local em http://localhost:8787 (usa .dev.vars)
 npm run simular    # simulador de conversa no terminal (precisa do dev a correr)
-npm run verificar  # tsc: correr sempre depois de alterar código
+npm run verificar  # tsc (código e testes): correr sempre depois de alterar código
+npm run testar     # testes automáticos (Vitest, pasta testes/)
 npm run deploy     # publicar (precisa de CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID)
 npm run logs       # wrangler tail do Worker publicado
 ```
