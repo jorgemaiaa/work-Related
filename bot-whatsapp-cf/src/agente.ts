@@ -225,18 +225,31 @@ export async function executarTurno(ctx: ContextoTurno, novas: LinhaMensagem[]):
   const mensagens = await montarMensagens(historico, novas, env.ANEXOS);
   if (!mensagens.length) return null;
 
+  // O system prompt é montado UMA vez por turno e não muda entre iterações. Os blocos de
+  // pensamento do modelo ficam ligados ao prompt exato em que nasceram: se o "Estado atual"
+  // mudasse a meio do turno, a API recusava o pedido seguinte (400, assinatura inválida no
+  // bloco thinking). As alterações feitas pelas ferramentas chegam ao modelo nos resultados
+  // das ferramentas (guardado, em_falta, alertas). No turno seguinte o estado é atualizado
+  // aqui, o que é permitido porque o histórico só leva texto, sem os pensamentos antigos.
+  const anexosInicio = anexosValidos(sql);
+  const fichaInicio = ctx.estado.ficha;
+  const sistema = [
+    // Parte fixa: fica em cache entre chamadas (mais barato e mais rápido)
+    { type: "text", text: PROMPT_SISTEMA, cache_control: { type: "ephemeral" } },
+    // Parte variável: estado da ficha no início deste turno
+    {
+      type: "text",
+      text: contextoDinamico(
+        ctx.estado.nomePerfil,
+        fichaInicio,
+        anexosInicio,
+        F.camposEmFalta(fichaInicio, anexosInicio),
+        F.verificarCoerencia(fichaInicio),
+      ),
+    },
+  ];
+
   for (let i = 0; i < MAX_ITERACOES; i++) {
-    const anexos = anexosValidos(sql);
-    const ficha = ctx.estado.ficha;
-    const sistema = [
-      // Parte fixa: fica em cache entre chamadas (mais barato e mais rápido)
-      { type: "text", text: PROMPT_SISTEMA, cache_control: { type: "ephemeral" } },
-      // Parte variável: estado da ficha neste momento
-      {
-        type: "text",
-        text: contextoDinamico(ctx.estado.nomePerfil, ficha, anexos, F.camposEmFalta(ficha, anexos), F.verificarCoerencia(ficha)),
-      },
-    ];
     const resp = await chamarClaude(env, {
       model: env.CLAUDE_MODEL,
       max_tokens: Number(env.CLAUDE_MAX_TOKENS || 1024),

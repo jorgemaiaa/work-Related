@@ -50,7 +50,8 @@ export function contextoDinamico(
   alertas: string[],
 ): string {
   return [
-    "Estado atual (gerado pelo sistema, não pelo cliente)",
+    "Estado atual, no início desta resposta (gerado pelo sistema, não pelo cliente).",
+    "Depois de chamares uma ferramenta, o resultado dela traz o estado mais recente (em_falta, alertas).",
     `Nome no WhatsApp: ${nome ?? "desconhecido"}`,
     `Ficha: ${JSON.stringify(ficha)}`,
     `Anexos utilizáveis registados: ${[...anexos].sort().join(", ") || "nenhum"}`,

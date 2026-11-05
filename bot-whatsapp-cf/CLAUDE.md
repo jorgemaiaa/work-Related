@@ -4,7 +4,7 @@
 
 Bot de WhatsApp de uma empresa portuguesa que instala carregadores de veículos elétricos. Conversa com o cliente, recolhe a informação técnica para a instalação (pisos, distâncias, percurso do cabo, rede mono/trifásica, potência contratada, fotos do quadro, do local e da fatura) e grava tudo no módulo personalizado "Análise Técnica" do Zoho CRM. A proposta comercial é gerada depois por um workflow no Zoho: **o bot nunca calcula nem indica preços**.
 
-Estado: **piloto em desenvolvimento**. O esqueleto funciona de ponta a ponta com o Claude e o Zoho simulados. Ainda não foi testado contra as APIs reais da Anthropic, da Meta nem do Zoho. As próximas tarefas estão em `docs/proximos-passos.md`.
+Estado: **piloto em desenvolvimento**. O esqueleto funciona de ponta a ponta com o Claude e o Zoho simulados. Já conversa com o Claude real no banco de testes (`/dev`); ainda não foi testado contra as APIs reais da Meta nem do Zoho. As próximas tarefas estão em `docs/proximos-passos.md`.
 
 ## Stack
 
@@ -51,7 +51,8 @@ A página `/dev` (`src/pagina-dev.html`) é o banco de testes: chat e ficha em t
 5. **Limites do strict tool use:** no máximo 24 parâmetros opcionais no total entre todas as ferramentas strict, e sem `minimum`/`maximum` no esquema. Os limites numéricos ficam em `LIMITES`, em `ficha.ts`.
 6. **Jurisdição UE (`JURISDICAO="eu"`) fixada antes do primeiro deploy.** Mudá-la depois cria Durable Objects novos e "perde" as conversas existentes.
 7. **Propriedade do registo no Zoho:** enquanto o estado é `em_recolha`, escreve o bot. A partir de `concluida` ou `humano`, o bot deixa de alterar dados (só faz a sincronização final).
-8. Ao alterar o esquema SQL em `conversa.ts`, os Durable Objects existentes já têm a tabela antiga: usar `ALTER TABLE` idempotente, nunca só mudar o `CREATE TABLE`.
+8. **Dentro de um turno, o pedido ao Claude só cresce no fim.** O system prompt (incluindo o "Estado atual") é montado uma vez por turno em `executarTurno` e não muda entre iterações; as mensagens só recebem acrescentos. Os blocos de pensamento do modelo ficam ligados ao prompt exato em que nasceram: alterar o system ou mensagens anteriores a meio do turno dá 400 ("Invalid signature in thinking block"). As novidades durante o turno vão nos resultados das ferramentas.
+9. Ao alterar o esquema SQL em `conversa.ts`, os Durable Objects existentes já têm a tabela antiga: usar `ALTER TABLE` idempotente, nunca só mudar o `CREATE TABLE`.
 
 ## Convenções
 
@@ -65,7 +66,6 @@ A página `/dev` (`src/pagina-dev.html`) é o banco de testes: chat e ficha em t
 
 ## Pontos por confirmar nas APIs reais
 
-- Se a API do Claude aceita os esquemas das ferramentas com `strict: true` tal como estão (primeira chamada real).
 - Versão da Graph API em `WA_GRAPH_VERSION`.
 - Formato dos telefones nos Contactos do Zoho (a pesquisa tenta `+351…` e o número nacional) e se a empresa usa Contacts ou Leads.
 - API names reais do módulo "Análise Técnica" e opções exatas das picklists.
