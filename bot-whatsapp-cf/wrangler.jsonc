@@ -31,5 +31,39 @@
     "HISTORY_MESSAGES": "30",
     "JURISDICAO": "eu",
     "MODO_DEV": "false"
+  },
+
+  // Staging: Worker separado (bot-analise-tecnica-staging) com bucket R2 próprio.
+  // Publicar com: npm run deploy:staging. Bindings e vars não são herdados do nível
+  // de cima, por isso repetem-se aqui. As migrations são partilhadas.
+  // Segredos do staging: npx wrangler secret put NOME --env staging (incluindo DEV_TOKEN).
+  "env": {
+    "staging": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "CONVERSAS", "class_name": "Conversa" },
+          { "name": "ZOHO_AUTH", "class_name": "ZohoAuth" }
+        ]
+      },
+      // Criar uma vez: npx wrangler r2 bucket create bot-anexos-staging --jurisdiction eu
+      "r2_buckets": [{ "binding": "ANEXOS", "bucket_name": "bot-anexos-staging", "jurisdiction": "eu" }],
+      "vars": {
+        "WA_GRAPH_VERSION": "v23.0",
+        "CLAUDE_MODEL": "claude-sonnet-5-5",
+        "CLAUDE_MAX_TOKENS": "1024",
+        "ANTHROPIC_API_URL": "https://api.anthropic.com",
+        "ZOHO_ENABLED": "false", // passa a "true" com a sandbox do Zoho (A6)
+        "ZOHO_ACCOUNTS_URL": "https://accounts.zoho.eu",
+        "ZOHO_API_URL": "https://www.zohoapis.eu",
+        "ZOHO_MODULE": "Analise_Tecnica",
+        "DEBOUNCE_MS": "8000",
+        "HISTORY_MESSAGES": "30",
+        "JURISDICAO": "eu",
+        // Rotas /dev/* ativas (protegidas por DEV_TOKEN) e WhatsApp desligado.
+        // Para testar com a Meta (A5): ENVIAR_WHATSAPP_EM_DEV = "true".
+        "MODO_DEV": "true",
+        "ENVIAR_WHATSAPP_EM_DEV": "false"
+      }
+    }
   }
 }

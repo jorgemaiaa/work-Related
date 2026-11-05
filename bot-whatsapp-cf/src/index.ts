@@ -1,4 +1,5 @@
 /** Worker: recebe o webhook da Meta e entrega cada mensagem ao Durable Object do cliente. */
+import { PAGINA_DEV, acessoDevPermitido } from "./dev";
 import { conversaDe, registar, type Env, type MensagemRecebida } from "./tipos";
 import { assinaturaValida, extrairMensagens } from "./whatsapp";
 
@@ -33,13 +34,27 @@ export default {
 
     if (url.pathname === "/saude") return Response.json({ ok: true });
 
-    if (url.pathname.startsWith("/dev/") && env.MODO_DEV === "true") return rotasDev(request, env, url);
+    if (env.MODO_DEV === "true") {
+      // A página não tem dados; as ações que ela faz passam por /dev/* e precisam do token
+      if (url.pathname === "/dev") {
+        return new Response(PAGINA_DEV, {
+          headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex", "cache-control": "no-store" },
+        });
+      }
+      if (url.pathname.startsWith("/dev/")) {
+        if (!(await acessoDevPermitido(request, env, url))) {
+          registar("dev_acesso_recusado", { rota: url.pathname });
+          return Response.json({ erro: "acesso recusado: falta o cabeçalho X-Dev-Token correto" }, { status: 401 });
+        }
+        return rotasDev(request, env, url);
+      }
+    }
 
     return new Response("Não encontrado", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;
 
-/** Rotas usadas pelo simulador (scripts/simulador.mjs). Só existem com MODO_DEV=true. */
+/** Rotas usadas pelo simulador (scripts/simulador.mjs e página /dev). Só existem com MODO_DEV=true e protegidas por DEV_TOKEN. */
 async function rotasDev(request: Request, env: Env, url: URL): Promise<Response> {
   try {
     if (url.pathname === "/dev/mensagem" && request.method === "POST") {

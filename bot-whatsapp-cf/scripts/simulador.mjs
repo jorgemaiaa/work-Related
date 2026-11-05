@@ -1,6 +1,7 @@
 // Conversa com o bot no terminal, sem WhatsApp. Precisa de `npm run dev` a correr noutro terminal.
 //
 // Uso: npm run simular [-- telefone]
+// Contra o staging: BOT_URL=https://... DEV_TOKEN=... npm run simular
 // Comandos:
 //   /foto caminho.jpg [legenda]   envia uma foto (ou um PDF)
 //   + texto                       acumula a mensagem sem responder (várias mensagens seguidas)
@@ -13,12 +14,14 @@ import { createInterface } from "node:readline/promises";
 
 const BASE = process.env.BOT_URL ?? "http://localhost:8787";
 const telefone = process.argv[2] ?? "351900000000";
+const DEV_TOKEN = process.env.DEV_TOKEN ?? "";
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
 async function pedir(caminho, corpo) {
+  const cabecalhos = { "content-type": "application/json", ...(DEV_TOKEN && { "X-Dev-Token": DEV_TOKEN }) };
   const r = await fetch(`${BASE}${caminho}`, corpo
-    ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) }
-    : undefined);
+    ? { method: "POST", headers: cabecalhos, body: JSON.stringify(corpo) }
+    : { headers: cabecalhos });
   const dados = await r.json();
   if (!r.ok) throw new Error(dados.erro ?? JSON.stringify(dados));
   return dados;

@@ -19,7 +19,8 @@ export interface Env {
   DEBOUNCE_MS: string;
   HISTORY_MESSAGES: string;
   JURISDICAO: string; // "eu" em produção; vazio em desenvolvimento local
-  MODO_DEV: string; // "true" só em desenvolvimento: ativa /dev/* e não envia WhatsApp
+  MODO_DEV: string; // "true" em desenvolvimento e staging: ativa /dev/* e, por omissão, não envia WhatsApp
+  ENVIAR_WHATSAPP_EM_DEV?: string; // "true": com MODO_DEV, envia WhatsApp na mesma (staging com a Meta)
 
   // Segredos
   WA_VERIFY_TOKEN: string;
@@ -30,6 +31,7 @@ export interface Env {
   ZOHO_CLIENT_ID: string;
   ZOHO_CLIENT_SECRET: string;
   ZOHO_REFRESH_TOKEN: string;
+  DEV_TOKEN?: string; // obrigatório para usar /dev/* fora do localhost (cabeçalho X-Dev-Token)
 }
 
 export type TipoMensagem = "texto" | "imagem" | "pdf" | "outro" | "boas_vindas";

@@ -8,6 +8,9 @@ MODO_DEV=true
 JURISDICAO=
 ZOHO_ENABLED=false
 DEBOUNCE_MS=2000
+# Opcional em local: sem DEV_TOKEN, as rotas /dev/* só respondem em localhost.
+# Com DEV_TOKEN, o simulador precisa de DEV_TOKEN=... no ambiente.
+DEV_TOKEN=
 
 # Preencher quando forem testar com a Meta e a sandbox do Zoho
 WA_VERIFY_TOKEN=

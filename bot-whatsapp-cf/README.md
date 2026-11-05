@@ -107,6 +107,23 @@ O Worker fica em `https://bot-analise-tecnica.<subdomínio>.workers.dev`. Podem 
 
 **Plano.** Confirmem na página de preços da Cloudflare se o plano gratuito dos Workers chega para o piloto ou se compensa o plano pago, que tem limites mais altos.
 
+## 2b. Staging
+
+O staging é um Worker separado (`bot-analise-tecnica-staging`) com bucket R2 e Durable Objects próprios. Tem as rotas `/dev/*` ativas, protegidas pelo segredo `DEV_TOKEN`, e por omissão não envia WhatsApp nem usa o Zoho.
+
+```bash
+npx wrangler r2 bucket create bot-anexos-staging --jurisdiction eu
+npx wrangler secret put ANTHROPIC_API_KEY --env staging
+npx wrangler secret put DEV_TOKEN --env staging    # texto longo e aleatório (mínimo 16 caracteres)
+npm run deploy:staging
+```
+
+- **Simulador no terminal contra o staging:** `BOT_URL=https://bot-analise-tecnica-staging.<subdomínio>.workers.dev DEV_TOKEN=... npm run simular`
+- **Simulador no browser:** abrir `https://bot-analise-tecnica-staging.<subdomínio>.workers.dev/dev` e colar o `DEV_TOKEN` no primeiro campo. A página em si não tem dados; todas as ações exigem o token, que fica guardado só nesse separador.
+- **Logs:** `npm run logs:staging`.
+- **Proteção de `/dev/*`:** com `DEV_TOKEN` definido, cada pedido tem de trazer o cabeçalho `X-Dev-Token` igual. Sem `DEV_TOKEN`, as rotas só respondem em `localhost`, por isso um Worker publicado nunca fica aberto por esquecimento. Um `DEV_TOKEN` com menos de 16 caracteres é recusado.
+- **WhatsApp no staging (A5):** pôr `ENVIAR_WHATSAPP_EM_DEV` a `"true"` em `env.staging.vars` (wrangler.jsonc), definir os segredos `WA_*` com `--env staging` e publicar de novo. As rotas `/dev/*` continuam disponíveis.
+
 ## 3. WhatsApp (Meta)
 
 1. Em developers.facebook.com, criar uma app do tipo Business e adicionar o produto WhatsApp. A Meta fornece um número de teste.
@@ -135,7 +152,7 @@ Se a vossa empresa trabalha com Leads em vez de Contacts, alterar `procurarConta
 
 - **Logs:** `npm run logs` mostra os eventos em tempo real. Também estão no painel (Workers Logs). Cada chamada de ferramenta fica registada com os dados do cliente, por isso definam um prazo de retenção curto.
 - **Ficheiros e RGPD:** configurar uma regra de ciclo de vida no bucket R2 para apagar fotos e PDFs ao fim de X dias.
-- **`MODO_DEV`** fica sempre `"false"` em produção. Com `"true"`, as rotas `/dev/*` ficam abertas e nada é enviado para o WhatsApp.
+- **`MODO_DEV`** fica sempre `"false"` em produção. Com `"true"`, as rotas `/dev/*` existem (protegidas por `DEV_TOKEN`, ou só em `localhost` sem ele) e nada é enviado para o WhatsApp, salvo com `ENVIAR_WHATSAPP_EM_DEV="true"`.
 - **Imagens:** são enviadas ao Claude sem redimensionar. O WhatsApp já comprime as fotos, e imagens acima de ~3,7 MB são ignoradas com aviso ao modelo.
 
 ## Falta fazer antes de lançar

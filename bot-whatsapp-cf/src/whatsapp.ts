@@ -76,7 +76,8 @@ export class WhatsApp {
   }
 
   async enviarTexto(para: string, texto: string): Promise<void> {
-    if (this.env.MODO_DEV === "true") return; // no simulador as respostas são devolvidas por HTTP
+    // No simulador as respostas são devolvidas por HTTP; o staging com a Meta liga o envio à parte
+    if (this.env.MODO_DEV === "true" && this.env.ENVIAR_WHATSAPP_EM_DEV !== "true") return;
     for (let i = 0; i < texto.length; i += LIMITE_TEXTO) {
       const r = await fetch(`${this.base}/${this.env.WA_PHONE_NUMBER_ID}/messages`, {
         method: "POST",
