@@ -1,0 +1,25 @@
+{
+  "name": "Bot de análise técnica",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "bash scripts/preparar-codespace.sh",
+  "forwardPorts": [
+    8787
+  ],
+  "portsAttributes": {
+    "8787": {
+      "label": "Worker local",
+      "onAutoForward": "silent"
+    }
+  },
+  "secrets": {
+    "BOT_ANTHROPIC_API_KEY": {
+      "description": "Chave da API da Anthropic usada pelo bot (não pelo Claude Code)"
+    },
+    "CLOUDFLARE_API_TOKEN": {
+      "description": "Token da Cloudflare criado com o modelo 'Edit Cloudflare Workers'"
+    },
+    "CLOUDFLARE_ACCOUNT_ID": {
+      "description": "ID da conta Cloudflare (painel > Workers & Pages)"
+    }
+  }
+}

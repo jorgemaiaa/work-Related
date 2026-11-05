@@ -1,0 +1,19 @@
+# Copiar para .dev.vars (só para desenvolvimento local; nunca pôr no Git).
+# Em produção, cada segredo vai com: npx wrangler secret put NOME
+
+ANTHROPIC_API_KEY=
+
+# Simulador: ativa /dev/*, não envia WhatsApp, não usa jurisdição nem Zoho
+MODO_DEV=true
+JURISDICAO=
+ZOHO_ENABLED=false
+DEBOUNCE_MS=2000
+
+# Preencher quando forem testar com a Meta e a sandbox do Zoho
+WA_VERIFY_TOKEN=
+WA_APP_SECRET=
+WA_ACCESS_TOKEN=
+WA_PHONE_NUMBER_ID=
+ZOHO_CLIENT_ID=
+ZOHO_CLIENT_SECRET=
+ZOHO_REFRESH_TOKEN=

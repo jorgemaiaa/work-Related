@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bot-analise-tecnica",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+
+  // Um Durable Object por cliente (Conversa) e um partilhado para o token do Zoho
+  "durable_objects": {
+    "bindings": [
+      { "name": "CONVERSAS", "class_name": "Conversa" },
+      { "name": "ZOHO_AUTH", "class_name": "ZohoAuth" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Conversa", "ZohoAuth"] }],
+
+  // Fotos e PDFs. Criar o bucket na UE: npx wrangler r2 bucket create bot-anexos --jurisdiction eu
+  "r2_buckets": [{ "binding": "ANEXOS", "bucket_name": "bot-anexos", "jurisdiction": "eu" }],
+
+  // Variáveis não secretas. Os segredos vão com: npx wrangler secret put NOME
+  "vars": {
+    "WA_GRAPH_VERSION": "v23.0",
+    "CLAUDE_MODEL": "claude-sonnet-5-5",
+    "CLAUDE_MAX_TOKENS": "1024",
+    "ANTHROPIC_API_URL": "https://api.anthropic.com",
+    "ZOHO_ENABLED": "true",
+    "ZOHO_ACCOUNTS_URL": "https://accounts.zoho.eu",
+    "ZOHO_API_URL": "https://www.zohoapis.eu",
+    "ZOHO_MODULE": "Analise_Tecnica",
+    "DEBOUNCE_MS": "8000",
+    "HISTORY_MESSAGES": "30",
+    "JURISDICAO": "eu",
+    "MODO_DEV": "false"
+  }
+}
