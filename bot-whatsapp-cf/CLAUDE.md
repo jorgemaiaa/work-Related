@@ -4,7 +4,7 @@
 
 Bot de WhatsApp de uma empresa portuguesa que instala carregadores de veículos elétricos. Conversa com o cliente, recolhe a informação técnica para a instalação (pisos, distâncias, percurso do cabo, rede mono/trifásica, potência contratada, fotos do quadro, do local e da fatura) e grava tudo no módulo personalizado "Análise Técnica" do Zoho CRM. A proposta comercial é gerada depois por um workflow no Zoho: **o bot nunca calcula nem indica preços**.
 
-Estado: **piloto em desenvolvimento**. O esqueleto funciona de ponta a ponta com o Claude e o Zoho simulados. Já conversa com o Claude real no banco de testes (`/dev`); ainda não foi testado contra as APIs reais da Meta nem do Zoho. As próximas tarefas estão em `docs/proximos-passos.md`.
+Estado: **piloto em desenvolvimento**. Já conversa com o Claude real no banco de testes (`/dev`); ainda não foi testado contra as APIs reais da Meta nem do Zoho. As próximas tarefas estão em `docs/proximos-passos.md`.
 
 ## Stack
 
