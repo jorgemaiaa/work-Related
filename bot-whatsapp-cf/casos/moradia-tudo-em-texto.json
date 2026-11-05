@@ -1,0 +1,38 @@
+{
+  "descricao": "Moradia com garagem: os campos de texto ficam preenchidos e coerentes; faltam só as fotos",
+  "mensagens": [
+    {
+      "texto": "Boa tarde, queria instalar um carregador em casa."
+    },
+    {
+      "texto": "É uma moradia e o carro fica na garagem da casa."
+    },
+    {
+      "texto": "O quadro elétrico está no rés-do-chão, na entrada. A garagem também é no rés-do-chão."
+    },
+    {
+      "texto": "Devem ser uns 12 metros. O cabo pode ir pela parede da garagem, em calha."
+    },
+    {
+      "texto": "A instalação é trifásica."
+    }
+  ],
+  "esperado": {
+    "estado": "em_recolha",
+    "ficha": {
+      "tipo_imovel": "moradia",
+      "tipo_estacionamento": "garagem_propria_moradia",
+      "rede": "trifasica",
+      "andar_quadro": 0,
+      "piso_estacionamento": 0,
+      "distancia_declarada_m": 12
+    },
+    "preenchidos": [
+      "percurso_descricao"
+    ],
+    "sem_alertas": true,
+    "em_falta_contem": [
+      "anexo:quadro_aberto"
+    ]
+  }
+}

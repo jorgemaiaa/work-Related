@@ -23,6 +23,14 @@ if [ ! -f .dev.vars ]; then
   fi
 fi
 
+# DEV_TOKEN para abrir o banco de testes (/dev) no browser pelo endereço reencaminhado do
+# Codespace. Também é acrescentado a um .dev.vars antigo que ainda não o tenha.
+if ! grep -q '^DEV_TOKEN=.\+' .dev.vars; then
+  TOKEN="$(node -e 'console.log(require("crypto").randomBytes(24).toString("hex"))')"
+  sed -i '/^DEV_TOKEN=/d' .dev.vars
+  echo "DEV_TOKEN=$TOKEN" >> .dev.vars
+fi
+
 mkdir -p fotos   # fotos de teste (não vão para o Git)
 
 # Claude Code (instalador oficial)
@@ -33,3 +41,5 @@ fi
 
 echo ""
 echo "Pronto. Terminal 1: npm run dev   |   Terminal 2: npm run simular   |   Claude Code: claude"
+echo "Banco de testes no browser: separador PORTS > porta 8787 > abrir e acrescentar /dev ao endereço."
+echo "O DEV_TOKEN a colar na página está em .dev.vars (grep DEV_TOKEN .dev.vars)."

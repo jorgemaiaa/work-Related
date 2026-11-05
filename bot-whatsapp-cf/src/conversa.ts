@@ -7,6 +7,7 @@
  */
 import { DurableObject } from "cloudflare:workers";
 import { anexosValidos, executarTurno } from "./agente";
+import { CAMPOS, camposEmFalta } from "./ficha";
 import { BOAS_VINDAS, MENSAGEM_FALHA, MENSAGEM_POS_CONCLUSAO } from "./prompts";
 import { estadoInicial, registar, type Env, type Estado, type LinhaMensagem, type MensagemRecebida } from "./tipos";
 import { WhatsApp } from "./whatsapp";
@@ -260,7 +261,18 @@ export class Conversa extends DurableObject<Env> {
     const anexos = this.sql
       .exec("SELECT id, anexo_categoria, anexo_utilizavel, anexo_nota FROM mensagens WHERE anexo_categoria IS NOT NULL")
       .toArray();
-    return { ...this.estado, anexos, anexosValidos: [...anexosValidos(this.sql)] };
+    const validos = anexosValidos(this.sql);
+    const mensagens = this.sql
+      .exec("SELECT id, direcao, tipo, texto, anexo_categoria, anexo_utilizavel FROM mensagens ORDER BY id")
+      .toArray();
+    return {
+      ...this.estado,
+      anexos,
+      anexosValidos: [...validos],
+      emFalta: camposEmFalta(this.estado.ficha, validos),
+      campos: Object.keys(CAMPOS),
+      mensagens,
+    };
   }
 
   async apagar(): Promise<void> {

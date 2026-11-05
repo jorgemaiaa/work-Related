@@ -8,8 +8,9 @@ MODO_DEV=true
 JURISDICAO=
 ZOHO_ENABLED=false
 DEBOUNCE_MS=2000
-# Opcional em local: sem DEV_TOKEN, as rotas /dev/* só respondem em localhost.
-# Com DEV_TOKEN, o simulador precisa de DEV_TOKEN=... no ambiente.
+# Sem DEV_TOKEN, as rotas /dev/* só respondem em localhost. No Codespace é gerado
+# automaticamente, para abrir o banco de testes (/dev) no browser. O simulador e o
+# npm run casos leem-no daqui.
 DEV_TOKEN=
 
 # Preencher quando forem testar com a Meta e a sandbox do Zoho

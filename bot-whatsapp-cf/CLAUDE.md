@@ -20,12 +20,15 @@ npm run dev        # Worker local em http://localhost:8787 (usa .dev.vars)
 npm run simular    # simulador de conversa no terminal (precisa do dev a correr)
 npm run verificar  # tsc (código e testes): correr sempre depois de alterar código
 npm run testar     # testes automáticos (Vitest, pasta testes/)
+npm run casos      # conversas de regressão (casos/*.json) contra o bot local; usa o Claude real
 npm run deploy     # publicar (precisa de CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID)
 npm run logs       # wrangler tail do Worker publicado
 npm run deploy:staging / npm run logs:staging   # o mesmo para o Worker de staging
 ```
 
-O simulador aceita `/foto caminho [legenda]`, `+ texto` (acumula sem responder), `/ficha` e `/reset`. As rotas `/dev/*` só existem com `MODO_DEV=true` e exigem o cabeçalho `X-Dev-Token` igual a `DEV_TOKEN` (sem `DEV_TOKEN`, só respondem em `localhost`). Contra o staging: `BOT_URL=... DEV_TOKEN=... npm run simular`, ou a página `/dev` no browser.
+O simulador aceita `/foto caminho [legenda]`, `+ texto` (acumula sem responder), `/ficha` e `/reset`. As rotas `/dev/*` só existem com `MODO_DEV=true` e exigem o cabeçalho `X-Dev-Token` igual a `DEV_TOKEN` (sem `DEV_TOKEN`, só respondem em `localhost`). O simulador e o `npm run casos` leem o `DEV_TOKEN` do ambiente ou de `.dev.vars`. Contra o staging: `BOT_URL=... DEV_TOKEN=... npm run simular`.
+
+A página `/dev` (`src/pagina-dev.html`) é o banco de testes: chat e ficha em tempo real lado a lado. Usa `/dev/ficha`, que devolve o estado, `emFalta`, `campos` e o histórico de mensagens.
 
 ## Arquitetura
 
@@ -36,7 +39,7 @@ O simulador aceita `/foto caminho [legenda]`, `+ texto` (acumula sem responder),
 - `src/zoho-mapa.ts`: mapeamento ficha → API names do Zoho. **Os nomes atuais são exemplos.**
 - `src/zoho.ts` e `src/zoho-auth.ts`: cliente Zoho e Durable Object único que guarda e renova o access token.
 - `src/whatsapp.ts`: envio de texto, descarga de media, parsing do webhook.
-- `src/dev.ts`: proteção das rotas `/dev/*` (`DEV_TOKEN`) e página do simulador web servida em `/dev`.
+- `src/dev.ts` e `src/pagina-dev.html`: proteção das rotas `/dev/*` (`DEV_TOKEN`) e página do banco de testes servida em `/dev`.
 - `src/prompts.ts`: prompt de sistema e mensagens fixas. Contém os marcadores `[EMPRESA]` e `[LINK_PRIVACIDADE]` por preencher.
 
 ## Decisões a manter
@@ -57,7 +60,8 @@ O simulador aceita `/foto caminho [legenda]`, `+ texto` (acumula sem responder),
 - Logs com `registar(evento, dados)` (JSON numa linha). Atenção: os logs podem conter dados pessoais.
 - `wrangler.jsonc` tem um ambiente `staging` (Worker e bucket R2 separados, `MODO_DEV=true`). Bindings e `vars` não são herdados: ao acrescentar uma variável ou binding, acrescentá-la também em `env.staging`.
 - Segredos nunca no código nem no Git: `.dev.vars` (local, gerado por `scripts/preparar-codespace.sh`) e `wrangler secret put` (produção). No Codespace, a chave do bot é o secret `BOT_ANTHROPIC_API_KEY`.
-- Antes de dar uma tarefa por concluída: `npm run verificar` e uma conversa no simulador que exercite a alteração.
+- Antes de dar uma tarefa por concluída: `npm run verificar`, `npm run testar` e uma conversa no simulador ou no banco de testes que exercite a alteração. Se a alteração mexer no comportamento do bot, correr também `npm run casos`.
+- Quando aparecer um erro numa conversa, acrescentar um caso em `casos/` que o reproduza.
 
 ## Pontos por confirmar nas APIs reais
 

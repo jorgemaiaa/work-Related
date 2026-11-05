@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Banco de testes</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fundo: #f4f4f2; --painel: #fff; --borda: #d9d9d4; --texto: #1d1d1b; --suave: #6b6b66;
+    --cliente: #d9f5c8; --bot: #fff; --chat: #ece8e0;
+    --ok: #1d7a3a; --aviso: #a35a00; --erro: #b3261e; --info: #2457a6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fundo: #161615; --painel: #1f1f1d; --borda: #3a3a37; --texto: #ececea; --suave: #a3a39e;
+      --cliente: #1f4a2c; --bot: #2a2a27; --chat: #121211;
+      --ok: #6fcf8a; --aviso: #f0b45a; --erro: #f2867d; --info: #8fb4f0;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--borda); background: var(--painel); }
+  header h1 { font-size: 17px; margin: 0 12px 0 0; }
+  header input { padding: 6px 8px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); color: inherit; min-width: 0; }
+  #token { flex: 1 1 180px; } #telefone { flex: 0 1 150px; }
+  button { padding: 6px 12px; border: 1px solid var(--borda); border-radius: 6px; background: var(--painel); color: inherit; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--suave); }
+  button:disabled { opacity: .5; cursor: default; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); height: calc(100vh - 56px); }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); height: auto; } #chat { height: 70vh; } }
+  #chat { display: flex; flex-direction: column; min-height: 0; background: var(--chat); }
+  #mensagens { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .bolha { max-width: min(85%, 560px); padding: 7px 10px; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 1px 1px #0002; }
+  .in { align-self: flex-end; background: var(--cliente); }
+  .out { align-self: flex-start; background: var(--bot); }
+  .sistema { align-self: center; font-size: 13px; color: var(--suave); text-align: center; max-width: 100%; overflow-wrap: anywhere; }
+  .sistema.erro { color: var(--erro); }
+  .anexo { display: inline-block; font-size: 12px; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; margin-right: 4px; }
+  .a-escrever { align-self: flex-start; color: var(--suave); font-style: italic; }
+  form { display: flex; gap: 8px; align-items: flex-end; padding: 10px; background: var(--painel); border-top: 1px solid var(--borda); flex-wrap: wrap; }
+  #texto { flex: 1 1 200px; min-height: 40px; max-height: 160px; resize: vertical; padding: 8px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo); color: inherit; font: inherit; }
+  #ficheiro { display: none; }
+  #nomeFicheiro { flex-basis: 100%; font-size: 13px; color: var(--suave); }
+  #nomeFicheiro:empty { display: none; }
+  .opcao { font-size: 13px; color: var(--suave); display: flex; gap: 4px; align-items: center; }
+  aside { overflow-y: auto; padding: 16px; border-left: 1px solid var(--borda); background: var(--painel); }
+  @media (max-width: 860px) { aside { border-left: 0; border-top: 1px solid var(--borda); } }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin: 18px 0 6px; }
+  aside h2:first-child { margin-top: 0; }
+  .estado { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 600; border: 1px solid currentColor; }
+  .estado.em_recolha { color: var(--info); } .estado.concluida { color: var(--ok); } .estado.humano { color: var(--aviso); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--fundo); border: 1px solid var(--borda); }
+  .vazio { color: var(--suave); font-size: 13px; }
+  ul.alertas { margin: 0; padding-left: 18px; color: var(--aviso); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 4px 0; border-bottom: 1px solid var(--borda); vertical-align: top; overflow-wrap: anywhere; }
+  td:first-child { color: var(--suave); padding-right: 8px; width: 45%; }
+  td.falta { color: var(--erro); }
+  .nota { font-size: 13px; color: var(--suave); }
+  details { margin-top: 18px; font-size: 13px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Banco de testes do bot</h1>
+  <input id="token" type="password" placeholder="DEV_TOKEN" autocomplete="off" aria-label="DEV_TOKEN">
+  <input id="telefone" type="text" aria-label="Telefone de teste" title="Cada telefone é uma conversa separada">
+  <button type="button" id="novo" title="Começa uma conversa com outro número">Novo cliente</button>
+  <button type="button" id="reset" title="Apaga esta conversa">Recomeçar</button>
+</header>
+<main>
+  <section id="chat" aria-label="Conversa">
+    <div id="mensagens" aria-live="polite"></div>
+    <form id="envio">
+      <button type="button" id="anexar" title="Anexar foto ou PDF">📎</button>
+      <input id="ficheiro" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+      <textarea id="texto" placeholder="Mensagem do cliente (Enter envia, Shift+Enter muda de linha)"></textarea>
+      <button type="submit" id="enviar">Enviar</button>
+      <label class="opcao" title="Guarda a mensagem sem o bot responder, como quando o cliente envia várias seguidas"><input id="acumular" type="checkbox"> acumular</label>
+      <div id="nomeFicheiro"></div>
+    </form>
+  </section>
+  <aside aria-label="Ficha">
+    <h2>Estado</h2>
+    <div id="estado"><span class="vazio">—</span></div>
+    <h2>Em falta</h2>
+    <div id="emFalta" class="chips"></div>
+    <h2>Alertas</h2>
+    <div id="alertas"></div>
+    <h2>Ficha</h2>
+    <table id="ficha"></table>
+    <h2>Anexos</h2>
+    <div id="anexos"></div>
+    <h2>Resumo</h2>
+    <div id="resumo"></div>
+    <details><summary>JSON completo</summary><pre id="json"></pre></details>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const guardado = (k, v) => { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch { return null; } };
+$("token").value = guardado("devToken") || "";
+$("telefone").value = guardado("telefone") || "351900000000";
+$("token").addEventListener("change", () => { guardado("devToken", $("token").value); atualizar(); });
+$("telefone").addEventListener("change", () => { guardado("telefone", $("telefone").value); atualizar(); });
+
+function el(tag, classe, texto) {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+}
+
+function sistema(texto, erro) {
+  const e = el("div", "sistema" + (erro ? " erro" : ""), texto);
+  $("mensagens").append(e);
+  e.scrollIntoView({ block: "end" });
+}
+
+async function pedir(caminho, corpo) {
+  const r = await fetch(caminho, {
+    method: corpo ? "POST" : "GET",
+    headers: { "content-type": "application/json", "X-Dev-Token": $("token").value },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const dados = await r.json().catch(() => ({ erro: "resposta inválida (" + r.status + ")" }));
+  if (!r.ok) throw new Error(dados.erro || String(r.status));
+  return dados;
+}
+
+function bolhaMensagem(m) {
+  const b = el("div", "bolha " + (m.direcao === "in" ? "in" : "out"));
+  if (m.tipo === "imagem" || m.tipo === "pdf") {
+    const rotulo = el("span", "anexo", (m.tipo === "pdf" ? "PDF" : "foto") + (m.anexo_categoria ? ": " + m.anexo_categoria + (m.anexo_utilizavel ? " ✓" : " ✗") : ""));
+    b.append(rotulo);
+  }
+  if (m.texto) b.append(document.createTextNode(m.texto));
+  return b;
+}
+
+function preencherPainel(d) {
+  const estado = el("span", "estado " + d.estado, d.estado.replace("_", " "));
+  $("estado").replaceChildren(estado);
+
+  $("emFalta").replaceChildren(...(d.emFalta.length ? d.emFalta.map((c) => el("span", "chip", c)) : [el("span", "vazio", "nada")]));
+
+  if (d.alertas.length) {
+    const ul = el("ul", "alertas");
+    for (const a of d.alertas) ul.append(el("li", "", a));
+    $("alertas").replaceChildren(ul);
+  } else $("alertas").replaceChildren(el("span", "vazio", "nenhum"));
+
+  const linhas = d.campos.map((c) => {
+    const tr = el("tr");
+    const valor = d.ficha[c];
+    tr.append(el("td", "", c), el("td", valor === undefined && d.emFalta.includes(c) ? "falta" : "", valor === undefined ? "—" : String(valor)));
+    return tr;
+  });
+  $("ficha").replaceChildren(...linhas);
+
+  $("anexos").replaceChildren(...(d.anexos.length ? d.anexos.map((a) => {
+    const div = el("div");
+    div.append(el("span", "chip", a.anexo_categoria + (a.anexo_utilizavel ? " ✓" : " ✗")), el("div", "nota", a.anexo_nota || ""));
+    return div;
+  }) : [el("span", "vazio", "nenhum")]));
+
+  $("resumo").replaceChildren(d.resumo ? el("div", "nota", d.resumo) : el("span", "vazio", "—"));
+  const { mensagens, campos, ...resto } = d;
+  $("json").textContent = JSON.stringify(resto, null, 2);
+}
+
+async function atualizar(comHistorico = true) {
+  try {
+    const d = await pedir("/dev/ficha?telefone=" + encodeURIComponent($("telefone").value));
+    preencherPainel(d);
+    if (comHistorico) {
+      $("mensagens").replaceChildren(...d.mensagens.map(bolhaMensagem));
+      if (!d.mensagens.length) sistema("Conversa vazia. Escreva como se fosse o cliente.");
+      $("mensagens").lastElementChild?.scrollIntoView({ block: "end" });
+    }
+  } catch (e) {
+    $("mensagens").replaceChildren();
+    sistema("Erro: " + e.message, true);
+  }
+}
+
+function base64(ficheiro) {
+  return new Promise((ok, falha) => {
+    const leitor = new FileReader();
+    leitor.onload = () => ok(String(leitor.result).split(",")[1]);
+    leitor.onerror = falha;
+    leitor.readAsDataURL(ficheiro);
+  });
+}
+
+$("anexar").addEventListener("click", () => $("ficheiro").click());
+$("ficheiro").addEventListener("change", () => { $("nomeFicheiro").textContent = $("ficheiro").files[0] ? "Anexo: " + $("ficheiro").files[0].name : ""; });
+$("texto").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("envio").requestSubmit(); }
+});
+
+$("envio").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const texto = $("texto").value.trim();
+  const ficheiro = $("ficheiro").files[0];
+  if (!texto && !ficheiro) return;
+  $("enviar").disabled = true;
+  const corpo = { telefone: $("telefone").value, acumular: $("acumular").checked, texto: texto || null };
+  let aEscrever = null;
+  try {
+    if (ficheiro) { corpo.ficheiroBase64 = await base64(ficheiro); corpo.nomeFicheiro = ficheiro.name; }
+    $("mensagens").querySelector(".sistema:only-child")?.remove();
+    $("mensagens").append(bolhaMensagem({ direcao: "in", tipo: ficheiro ? (ficheiro.name.toLowerCase().endsWith(".pdf") ? "pdf" : "imagem") : "texto", texto }));
+    $("texto").value = ""; $("ficheiro").value = ""; $("nomeFicheiro").textContent = "";
+    if (!corpo.acumular) {
+      aEscrever = el("div", "a-escrever", "a escrever…");
+      $("mensagens").append(aEscrever);
+      aEscrever.scrollIntoView({ block: "end" });
+    }
+    await pedir("/dev/mensagem", corpo);
+    await atualizar();
+  } catch (e) {
+    aEscrever?.remove();
+    sistema("Erro: " + e.message, true);
+    await atualizar(false);
+  }
+  $("enviar").disabled = false;
+  $("texto").focus();
+});
+
+$("novo").addEventListener("click", () => {
+  $("telefone").value = "3519" + String(Math.floor(Math.random() * 1e8)).padStart(8, "0");
+  guardado("telefone", $("telefone").value);
+  atualizar();
+});
+
+$("reset").addEventListener("click", async () => {
+  if (!confirm("Apagar esta conversa e a ficha?")) return;
+  try { await pedir("/dev/reset", { telefone: $("telefone").value }); await atualizar(); }
+  catch (e) { sistema("Erro: " + e.message, true); }
+});
+
+atualizar();
+</script>
+</body>
+</html>

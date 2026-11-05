@@ -1,0 +1,16 @@
+{
+  "descricao": "O cliente corrige um valor: fica o último",
+  "mensagens": [
+    {
+      "texto": "Tenho uma moradia com garagem. O quadro e a garagem estão os dois no rés-do-chão, a uns 10 metros."
+    },
+    {
+      "texto": "Desculpe, enganei-me: são 25 metros, não 10."
+    }
+  ],
+  "esperado": {
+    "ficha": {
+      "distancia_declarada_m": 25
+    }
+  }
+}

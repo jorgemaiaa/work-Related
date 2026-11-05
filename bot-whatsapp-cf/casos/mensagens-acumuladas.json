@@ -1,0 +1,24 @@
+{
+  "descricao": "Várias mensagens seguidas antes da resposta: o bot usa todas",
+  "mensagens": [
+    {
+      "texto": "Olá, é para um apartamento.",
+      "acumular": true
+    },
+    {
+      "texto": "O quadro elétrico está no 2.º andar.",
+      "acumular": true
+    },
+    {
+      "texto": "E o carro fica no piso -1, num lugar aberto da garagem do prédio."
+    }
+  ],
+  "esperado": {
+    "ficha": {
+      "tipo_imovel": "apartamento",
+      "andar_quadro": 2,
+      "piso_estacionamento": -1,
+      "tipo_estacionamento": "lugar_aberto_condominio"
+    }
+  }
+}

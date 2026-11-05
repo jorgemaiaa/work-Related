@@ -82,7 +82,18 @@ No simulador:
 
 Com `MODO_DEV=true` as respostas aparecem no terminal e nada é enviado para o WhatsApp. O R2 e os Durable Objects são simulados localmente.
 
-`npm run verificar` confirma os tipos do TypeScript.
+### Banco de testes no browser
+
+Com `npm run dev` a correr, a página `/dev` é um banco de testes: conversa como no WhatsApp (texto, fotos e PDFs) e, ao lado, a ficha em tempo real (estado, campos, o que falta, alertas, anexos e resumo). O botão "Novo cliente" começa outra conversa com outro número; "Recomeçar" apaga a atual.
+
+- **No Codespace:** separador PORTS, porta 8787, abrir no browser e acrescentar `/dev` ao endereço. Colar no primeiro campo o `DEV_TOKEN` de `.dev.vars` (`grep DEV_TOKEN .dev.vars`). Num Codespace criado antes desta versão, correr `bash scripts/preparar-codespace.sh` uma vez para gerar o token e reiniciar o `npm run dev`.
+- **Fora do Codespace:** `http://localhost:8787/dev` (sem `DEV_TOKEN` em `.dev.vars`, o campo pode ficar vazio).
+
+### Casos de regressão
+
+`npm run casos` corre as conversas de `casos/*.json` contra o bot e verifica o estado final da ficha (ver `casos/LEIA-ME.md`). Usa o Claude real, por isso tem custo.
+
+`npm run verificar` confirma os tipos do TypeScript e `npm run testar` corre os testes automáticos.
 
 ## 2. Publicar na Cloudflare
 

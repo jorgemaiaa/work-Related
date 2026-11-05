@@ -11,10 +11,11 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { devToken } from "./dev-token.mjs";
 
 const BASE = process.env.BOT_URL ?? "http://localhost:8787";
 const telefone = process.argv[2] ?? "351900000000";
-const DEV_TOKEN = process.env.DEV_TOKEN ?? "";
+const DEV_TOKEN = devToken(); // do ambiente ou do .dev.vars
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
 async function pedir(caminho, corpo) {

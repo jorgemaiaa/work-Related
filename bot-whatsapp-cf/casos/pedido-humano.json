@@ -1,0 +1,14 @@
+{
+  "descricao": "O cliente pede para falar com uma pessoa",
+  "mensagens": [
+    {
+      "texto": "Boa tarde."
+    },
+    {
+      "texto": "Prefiro falar com uma pessoa da vossa equipa, por favor."
+    }
+  ],
+  "esperado": {
+    "estado": "humano"
+  }
+}

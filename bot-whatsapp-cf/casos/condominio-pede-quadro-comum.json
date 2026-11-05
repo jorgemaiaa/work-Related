@@ -1,0 +1,18 @@
+{
+  "descricao": "Lugar aberto em condomínio: quadro dos serviços comuns passa a ser obrigatório",
+  "mensagens": [
+    {
+      "texto": "Bom dia. Vivo num apartamento e o carro fica num lugar aberto na garagem do condomínio, sem box."
+    }
+  ],
+  "esperado": {
+    "estado": "em_recolha",
+    "ficha": {
+      "tipo_imovel": "apartamento",
+      "tipo_estacionamento": "lugar_aberto_condominio"
+    },
+    "em_falta_contem": [
+      "quadro_servicos_comuns"
+    ]
+  }
+}

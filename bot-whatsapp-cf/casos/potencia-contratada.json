@@ -1,0 +1,15 @@
+{
+  "descricao": "Potência atual e pretendida com vírgula decimal",
+  "mensagens": [
+    {
+      "texto": "Tenho 6,9 kVA contratados e estou a pensar passar para 10,35 kVA por causa do carregador."
+    }
+  ],
+  "esperado": {
+    "ficha": {
+      "potencia_contratada_kva": 6.9,
+      "potencia_pretendida_kva": 10.35
+    },
+    "sem_alertas": true
+  }
+}

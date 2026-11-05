@@ -1,0 +1,27 @@
+{
+  "descricao": "Caso de referência: quadro no piso 5, carro no piso -1 e 6 m declarados geram alerta",
+  "mensagens": [
+    {
+      "texto": "Olá. Moro num apartamento no 5.º andar e queria um carregador na garagem do prédio."
+    },
+    {
+      "texto": "O quadro elétrico está dentro de casa, no 5.º andar. O carro fica numa box fechada no piso -1."
+    },
+    {
+      "texto": "A distância deve ser uns 6 metros. O cabo podia descer pela coluna montante do prédio."
+    }
+  ],
+  "esperado": {
+    "estado": "em_recolha",
+    "ficha": {
+      "tipo_imovel": "apartamento",
+      "tipo_estacionamento": "box_fechada_condominio",
+      "andar_quadro": 5,
+      "piso_estacionamento": -1,
+      "distancia_declarada_m": 6
+    },
+    "alertas_contem": [
+      "mínimo vertical"
+    ]
+  }
+}
