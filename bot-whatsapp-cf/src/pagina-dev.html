@@ -77,7 +77,7 @@
     <div id="mensagens" aria-live="polite"></div>
     <form id="envio">
       <button type="button" id="anexar" title="Anexar foto ou PDF">📎</button>
-      <input id="ficheiro" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+      <input id="ficheiro" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
       <textarea id="texto" placeholder="Mensagem do cliente (Enter envia, Shift+Enter muda de linha)"></textarea>
       <button type="submit" id="enviar">Enviar</button>
       <label class="opcao" title="Guarda a mensagem sem o bot responder, como quando o cliente envia várias seguidas"><input id="acumular" type="checkbox"> acumular</label>
@@ -188,40 +188,74 @@ async function atualizar(comHistorico = true) {
   }
 }
 
-function base64(ficheiro) {
+function base64(blob) {
   return new Promise((ok, falha) => {
     const leitor = new FileReader();
     leitor.onload = () => ok(String(leitor.result).split(",")[1]);
     leitor.onerror = falha;
-    leitor.readAsDataURL(ficheiro);
+    leitor.readAsDataURL(blob);
   });
 }
 
+// Como o WhatsApp: as fotos chegam comprimidas. Lado maior até 1600 px, JPEG 85 %.
+// (O Claude também não aproveita mais de ~1568 px.) PDFs seguem como estão.
+const LADO_MAXIMO = 1600;
+async function prepararFicheiro(ficheiro) {
+  const pdf = ficheiro.name.toLowerCase().endsWith(".pdf") || ficheiro.type === "application/pdf";
+  if (pdf) return { base64: await base64(ficheiro), nome: ficheiro.name, tipo: "pdf" };
+  let imagem;
+  try { imagem = await createImageBitmap(ficheiro); }
+  catch { throw new Error("o browser não conseguiu abrir " + ficheiro.name + " (formato não suportado?)"); }
+  const escala = Math.min(1, LADO_MAXIMO / Math.max(imagem.width, imagem.height));
+  const tela = document.createElement("canvas");
+  tela.width = Math.round(imagem.width * escala);
+  tela.height = Math.round(imagem.height * escala);
+  tela.getContext("2d").drawImage(imagem, 0, 0, tela.width, tela.height);
+  imagem.close();
+  const jpeg = await new Promise((ok) => tela.toBlob(ok, "image/jpeg", 0.85));
+  const nome = ficheiro.name.replace(/\.[^.]+$/, "") + ".jpg";
+  return { base64: await base64(jpeg), nome, tipo: "imagem" };
+}
+
+function listarFicheiros() {
+  const nomes = [...$("ficheiro").files].map((f) => f.name);
+  $("nomeFicheiro").textContent = nomes.length ? "Anexos: " + nomes.join(", ") : "";
+}
+
 $("anexar").addEventListener("click", () => $("ficheiro").click());
-$("ficheiro").addEventListener("change", () => { $("nomeFicheiro").textContent = $("ficheiro").files[0] ? "Anexo: " + $("ficheiro").files[0].name : ""; });
+$("ficheiro").addEventListener("change", listarFicheiros);
 $("texto").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("envio").requestSubmit(); }
 });
 
+// Cada ficheiro é uma mensagem, como no WhatsApp. O texto vai como legenda do primeiro.
+// Só a última mensagem pede resposta ao bot (as anteriores ficam acumuladas).
 $("envio").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const texto = $("texto").value.trim();
-  const ficheiro = $("ficheiro").files[0];
-  if (!texto && !ficheiro) return;
+  const ficheiros = [...$("ficheiro").files];
+  if (!texto && !ficheiros.length) return;
   $("enviar").disabled = true;
-  const corpo = { telefone: $("telefone").value, acumular: $("acumular").checked, texto: texto || null };
+  const acumularTudo = $("acumular").checked;
   let aEscrever = null;
   try {
-    if (ficheiro) { corpo.ficheiroBase64 = await base64(ficheiro); corpo.nomeFicheiro = ficheiro.name; }
+    const mensagens = ficheiros.length
+      ? await Promise.all(ficheiros.map(prepararFicheiro)).then((lista) => lista.map((f, i) => ({ ...f, texto: i === 0 ? texto || null : null })))
+      : [{ texto }];
+    $("texto").value = ""; $("ficheiro").value = ""; listarFicheiros();
     $("mensagens").querySelector(".sistema:only-child")?.remove();
-    $("mensagens").append(bolhaMensagem({ direcao: "in", tipo: ficheiro ? (ficheiro.name.toLowerCase().endsWith(".pdf") ? "pdf" : "imagem") : "texto", texto }));
-    $("texto").value = ""; $("ficheiro").value = ""; $("nomeFicheiro").textContent = "";
-    if (!corpo.acumular) {
-      aEscrever = el("div", "a-escrever", "a escrever…");
-      $("mensagens").append(aEscrever);
-      aEscrever.scrollIntoView({ block: "end" });
+    for (const [i, m] of mensagens.entries()) {
+      const ultima = i === mensagens.length - 1;
+      const corpo = { telefone: $("telefone").value, acumular: acumularTudo || !ultima, texto: m.texto || null };
+      if (m.base64) { corpo.ficheiroBase64 = m.base64; corpo.nomeFicheiro = m.nome; }
+      $("mensagens").append(bolhaMensagem({ direcao: "in", tipo: m.tipo || "texto", texto: m.texto }));
+      if (!corpo.acumular) {
+        aEscrever = el("div", "a-escrever", "a escrever…");
+        $("mensagens").append(aEscrever);
+      }
+      $("mensagens").lastElementChild.scrollIntoView({ block: "end" });
+      await pedir("/dev/mensagem", corpo);
     }
-    await pedir("/dev/mensagem", corpo);
     await atualizar();
   } catch (e) {
     aEscrever?.remove();
