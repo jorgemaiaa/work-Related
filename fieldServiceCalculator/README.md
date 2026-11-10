@@ -6,7 +6,7 @@ App web single-page com dois separadores:
 2. **Agenda** — calendário mensal de agendamentos (instalação / visita técnica / pós-venda).
 3. **Custos** — tabela de preços por instalador e construtor de orçamentos.
 
-Toda a aplicação está protegida por uma palavra-passe partilhada — quem chega ao URL sem cookie de sessão vê um ecrã de login antes de qualquer conteúdo.
+A aplicação só abre dentro do Zoho CRM (Web Tab). Abrir o URL diretamente mostra "Acesso restrito". Não há palavra-passe.
 
 Stack: HTML + Leaflet + OSRM + Nominatim no frontend; Cloudflare Pages + Pages Functions + KV no backend; gate de auth feito por uma *middleware* (cookie HMAC-assinado).
 
@@ -61,9 +61,9 @@ Instaladores fora destas famílias (adicionados manualmente) usam a sua `color` 
 
 ### Privacidade
 
-Toda a aplicação (HTML, JS, `/api/*`) está atrás de uma **palavra-passe partilhada** definida via middleware em `functions/_middleware.js`. Um visitante sem cookie de sessão vê um ecrã de login servido pelo próprio backend — nem chega a transferir o `index.html`. A sessão dura **30 dias**.
+A regra "só dentro do Zoho" é aplicada pela middleware em `functions/_middleware.js` (ver **Notas de segurança**). Não há palavra-passe.
 
-Se a Agenda for usada fora do backend (deploy ainda não feito, sem rede, GH Pages), cai num modo *local* que guarda em `localStorage` (chave `schedules.v1.cache`) só para experimentar; os dados ficam só no browser.
+Se a Agenda for usada fora do backend (deploy ainda não feito, sem rede), cai num modo *local* que guarda em `localStorage` (chave `schedules.v1.cache`) só para experimentar; os dados ficam só no browser.
 
 ---
 
@@ -82,9 +82,8 @@ fieldServiceCalculator/
 ├── index.html
 ├── README.md
 └── functions/
-    ├── _middleware.js            # gates the whole site, serves login page
+    ├── _middleware.js            # Zoho-only access rule for the whole site
     └── api/
-        ├── auth.js               # POST /api/auth (login) + DELETE (logout)
         ├── prices.js             # GET + PUT   /api/prices
         ├── schedules.js          # GET + POST  /api/schedules
         └── schedules/
@@ -93,7 +92,7 @@ fieldServiceCalculator/
 
 ---
 
-## Deploy — Cloudflare Pages + KV + palavra-passe partilhada
+## Deploy — Cloudflare Pages + KV
 
 Setup único, ~10 minutos no painel do Cloudflare. Não precisa de domínio próprio nem de Cloudflare Access.
 
@@ -117,36 +116,26 @@ Setup único, ~10 minutos no painel do Cloudflare. Não precisa de domínio pró
    - KV namespace: escolhe o que acabaste de criar.
 3. Aplica também ao ambiente **Preview** se quiseres testar branches.
 
-### 3. Definir a palavra-passe e o segredo de sessão
+### 3. Variáveis de ambiente (opcionais)
 
-No projeto Pages → **Settings → Environment variables** (ou **Variables and Secrets**) → adiciona **duas** variáveis para o ambiente **Production** (e Preview, se usares):
+No projeto Pages → **Settings → Variables and Secrets** → ambiente **Production**:
 
-| Variável            | Tipo            | Valor                                                   |
-| ------------------- | --------------- | ------------------------------------------------------- |
-| `AGENDA_PASSWORD`   | **Encrypt** ✓   | Palavra-passe que vais partilhar com a equipa.          |
-| `SESSION_SECRET`    | **Encrypt** ✓   | String aleatória longa (≥ 32 chars). Usa um gerador.    |
-| `ZOHO_ONLY`         | opcional        | `true` → a app só abre dentro do Zoho CRM (Web Tab). Abrir o URL diretamente mostra "Acesso restrito". Remover/`false` para voltar ao acesso direto. |
-| `FRAME_ANCESTORS`   | opcional        | Domínios autorizados a embeber a app quando `ZOHO_ONLY=true`. Por defeito `https://*.zoho.eu https://*.zoho.com`. |
+| Variável              | Valor |
+| --------------------- | ----- |
+| `ALLOW_DIRECT_ACCESS` | `true` desliga a regra "só dentro do Zoho" — a app abre em qualquer browser, **sem proteção nenhuma**. Útil só para testes/emergências. |
+| `FRAME_ANCESTORS`     | Domínios autorizados a embeber a app. Por defeito `https://*.zoho.eu https://*.zoho.com`. |
 
-Gera um `SESSION_SECRET` no terminal:
-
-```bash
-openssl rand -base64 48
-```
-
-Se mudares o `SESSION_SECRET`, todas as sessões existentes ficam inválidas (toda a gente tem de voltar a entrar). Útil em caso de fuga.
+As variáveis antigas `AGENDA_PASSWORD` e `SESSION_SECRET` já não são usadas e podem ser apagadas.
 
 ### 4. Re-deploy
 
-Depois de definir as variáveis: projeto Pages → **Deployments** → **Retry deployment** (ou faz um novo push). Bindings e env vars só ficam ativos no próximo deploy.
+Depois de mudar variáveis ou bindings: projeto Pages → **Deployments** → **Retry deployment** (ou faz um novo push). Só ficam ativos no próximo deploy.
 
 ### 5. Como funciona
 
-- **Toda** a aplicação (HTML, JS estáticos, `/api/*`) está atrás da middleware.
-- Visitante sem cookie de sessão → servida uma página de login HTML mínima (também servida pela middleware). Submeter → `POST /api/auth` → servidor compara (constant-time) com `AGENDA_PASSWORD`. Em caso de sucesso, devolve um cookie HMAC-assinado válido por **30 dias** (`HttpOnly`, `Secure`, `SameSite=Lax`) e a página recarrega para mostrar a app.
-- Se o cookie expira enquanto se está a usar a Agenda, a UI abre um modal inline (sem perder estado) e refaz o pedido.
-- Botão **Sair** no topo apaga o cookie e recarrega a página (voltando ao ecrã de login).
-- Tentativas falhadas: máx. **5 por minuto por IP** (rate limit guardado em KV).
+- Cada pedido passa pela middleware. Abrir o URL diretamente (navegação de topo, `Sec-Fetch-Dest: document`) → página "Acesso restrito".
+- Dentro de uma iframe (Zoho Web Tab) a app carrega normalmente, e os pedidos da própria app a `/api/*` passam.
+- O cabeçalho `Content-Security-Policy: frame-ancestors …` faz o browser recusar mostrar a app dentro de qualquer site que não seja Zoho.
 
 ### 6. (Opcional) Domínio próprio
 
@@ -175,19 +164,16 @@ Para testar as Functions localmente, usa `wrangler pages dev`:
 ```bash
 npx wrangler pages dev fieldServiceCalculator \
   --kv SCHEDULES_KV \
-  --binding AGENDA_PASSWORD=devpwd \
-  --binding SESSION_SECRET=dev-secret-change-me-please
+  --binding ALLOW_DIRECT_ACCESS=true
 ```
 
 ---
 
 ## Notas de segurança
 
-- **`SESSION_SECRET` é o que protege os cookies.** Tem de ser longo e aleatório. Se vazar, qualquer pessoa pode forjar cookies de sessão até o rodares.
-- **`AGENDA_PASSWORD` é partilhada por toda a equipa.** Quando alguém sai, muda-a — todas as sessões existentes continuam válidas até expirarem (30 dias), excepto se também rodares `SESSION_SECRET` (o que invalida tudo imediatamente).
-- O cookie é `HttpOnly` + `Secure` + `SameSite=Lax`, ou seja: não acessível por JS no browser e só viaja em HTTPS.
-- Rate limit: 5 tentativas falhadas / minuto / IP. Mitiga força-bruta superficial; um atacante distribuído passa por cima. Se for relevante, adicionar **Security → WAF → Rate limiting rules** com limites mais agressivos.
-- Sem auditoria por utilizador (é uma palavra-passe partilhada — não há "quem"). Os campos `createdAt` / `updatedAt` ficam, mas `createdBy` foi removido.
+- **Não há autenticação.** A regra "só dentro do Zoho" assenta em cabeçalhos que os browsers enviam (`Sec-Fetch-*`) e no CSP `frame-ancestors`. Impede o acesso normal fora do Zoho, mas um script/ferramenta (ex.: `curl`) pode falsificar esses cabeçalhos e ler/escrever os dados da API se souber o URL.
+- A Agenda guarda nomes de clientes e referências (dados pessoais). Se isso passar a ser sensível, voltar a pôr autenticação (palavra-passe ou login Zoho via OAuth).
+- Sem auditoria por utilizador. Os campos `createdAt` / `updatedAt` ficam.
 
 ---
 

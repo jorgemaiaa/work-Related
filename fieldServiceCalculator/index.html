@@ -587,7 +587,6 @@
     <button data-tab="agenda">Agenda</button>
     <button data-tab="costs">Custos</button>
     <div class="spacer"></div>
-    <button id="logoutBtn" class="ghost tiny" style="margin-right:8px;">Sair</button>
   </header>
 
   <main id="content">
@@ -1122,8 +1121,6 @@
       } catch (err) {
         if (err.code === 'no-backend' || err.code === 'network') {
           installersMode = 'local';
-        } else if (err.code === 'auth') {
-          return;
         } else {
           alert('Erro ao apagar: ' + err.message);
           return;
@@ -1214,7 +1211,6 @@
         technicians.push(created);
       }
     } catch (err) {
-      if (err.code === 'auth') return;
       alert('Erro ao guardar: ' + err.message);
       return;
     }
@@ -1246,10 +1242,6 @@
   // ============================================================
   document.querySelectorAll('#tabbar button[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-  document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await apiLogout();
-    location.reload();
   });
   function switchTab(name) {
     document.querySelectorAll('#tabbar button[data-tab]').forEach(b => {
@@ -1305,7 +1297,6 @@
       localStorage.setItem(PRICES_CACHE_KEY, JSON.stringify(prices));
       setPriceStatus('');
     } catch (e) {
-      if (e.code === 'auth') { costsLoaded = false; return; }
       pricesMode = 'local';
       try { prices = JSON.parse(localStorage.getItem(PRICES_CACHE_KEY) || '{}') || {}; } catch (_) { prices = {}; }
       setPriceStatus('⚠️ Backend indisponível — preços guardados apenas neste browser.');
@@ -1390,7 +1381,7 @@
         : '⚠️ Backend indisponível — preços guardados apenas neste browser.');
       renderQuote();
     } catch (e) {
-      if (e.code !== 'auth') alert('Erro ao guardar preços: ' + e.message);
+      alert('Erro ao guardar preços: ' + e.message);
     } finally {
       btn.disabled = false;
     }
@@ -1592,60 +1583,8 @@
   });
 
   // ============================================================
-  // Agenda — API client (with shared-password login on 401)
+  // API client
   // ============================================================
-  let loginInFlight = null;
-
-  function showLoginModal(errorMsg) {
-    if (loginInFlight) return loginInFlight;
-    loginInFlight = new Promise((resolve) => {
-      const modal = document.getElementById('recordModal');
-      modal.hidden = false;
-      modal.innerHTML = `
-        <div class="modal">
-          <h3>🔒 Acesso protegido</h3>
-          <p style="margin:0 0 10px; color:var(--muted); font-size:13px;">Introduz a palavra-passe da equipa.</p>
-          <input type="password" id="loginPwd" autocomplete="current-password" />
-          <div id="loginErr" style="color:var(--danger); font-size:12px; margin-top:8px; min-height:14px;">${escapeHtml(errorMsg || '')}</div>
-          <div class="actions-row">
-            <button class="ghost" id="loginCancel">Cancelar</button>
-            <button class="primary" id="loginSubmit">Entrar</button>
-          </div>
-        </div>`;
-      const finish = (ok) => {
-        loginInFlight = null;
-        modal.hidden = true;
-        modal.innerHTML = '';
-        resolve(ok);
-      };
-      const submit = async () => {
-        const pwd = document.getElementById('loginPwd').value;
-        const errEl = document.getElementById('loginErr');
-        errEl.textContent = '';
-        try {
-          const r = await fetch('/api/auth', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: pwd }),
-          });
-          if (r.ok) return finish(true);
-          if (r.status === 429) { errEl.textContent = 'Demasiadas tentativas. Tenta dentro de 1 minuto.'; return; }
-          if (r.status === 401) { errEl.textContent = 'Palavra-passe incorrecta.'; return; }
-          errEl.textContent = 'Erro do servidor (HTTP ' + r.status + '). Tenta novamente.';
-        } catch (e) {
-          errEl.textContent = 'Erro de rede: ' + e.message;
-        }
-      };
-      document.getElementById('loginSubmit').addEventListener('click', submit);
-      document.getElementById('loginCancel').addEventListener('click', () => finish(false));
-      const inp = document.getElementById('loginPwd');
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-      setTimeout(() => inp.focus(), 0);
-    });
-    return loginInFlight;
-  }
-
   async function apiRequest(path, options = {}) {
     let r;
     try {
@@ -1659,12 +1598,6 @@
       const err = new Error('endpoint not found');
       err.code = 'no-backend';
       throw err;
-    }
-    if (r.status === 401) {
-      const ok = await showLoginModal();
-      if (!ok) { const err = new Error('login cancelled'); err.code = 'auth'; throw err; }
-      r = await fetch(path, { ...options, credentials: 'same-origin' });
-      if (r.status === 401) { const err = new Error('still unauthenticated'); err.code = 'auth'; throw err; }
     }
     return r;
   }
@@ -1696,9 +1629,6 @@
   async function apiDelete(id) {
     const r = await apiRequest('/api/schedules/' + encodeURIComponent(id), { method: 'DELETE' });
     if (!r.ok) throw new Error('DELETE /api/schedules/:id ' + r.status);
-  }
-  async function apiLogout() {
-    try { await fetch('/api/auth', { method: 'DELETE', credentials: 'same-origin' }); } catch (e) {}
   }
 
   // ---- Installers API ----
@@ -1756,8 +1686,6 @@
     } catch (e) {
       if (e.code === 'no-backend' || e.code === 'network') {
         installersMode = 'local';
-      } else if (e.code === 'auth') {
-        // user cancelled login — leave local cache in place
       }
       // else: leave silent, technicians already has the local cache
     }
@@ -1782,10 +1710,7 @@
       saveSchedulesCache();
       hideBanner();
     } catch (e) {
-      if (e.code === 'auth') {
-        schedules = [];
-        showAuthRequiredBanner();
-      } else if (e.code === 'no-backend' || e.code === 'network') {
+      if (e.code === 'no-backend' || e.code === 'network') {
         agendaMode = 'local';
         schedules = loadSchedulesCache();
         showLocalBanner(e.message);
@@ -1797,18 +1722,6 @@
     }
     renderCalendar();
     refreshDayPanel();
-  }
-  function showAuthRequiredBanner() {
-    const el = document.getElementById('authBanner');
-    el.hidden = false;
-    el.className = 'auth-banner';
-    el.innerHTML = `🔒 Acesso protegido. <a href="#" id="authLink">Iniciar sessão</a> para ver e editar os agendamentos.`;
-    placeBannerInAgenda();
-    document.getElementById('authLink').addEventListener('click', async (e) => {
-      e.preventDefault();
-      const ok = await showLoginModal();
-      if (ok) { hideBanner(); await loadAgenda(); }
-    });
   }
   function showLocalBanner(msg) {
     const el = document.getElementById('authBanner');
@@ -2125,7 +2038,6 @@
         renderCalendar();
         refreshDayPanel();
       } catch (err) {
-        if (err.code === 'auth') return showAuthRequiredBanner();
         alert('Erro ao apagar: ' + err.message);
       }
     }
@@ -2218,7 +2130,6 @@
       renderCalendar();
       refreshDayPanel();
     } catch (err) {
-      if (err.code === 'auth') { closeRecordForm(); return showAuthRequiredBanner(); }
       alert('Erro ao guardar: ' + err.message);
     }
   }
