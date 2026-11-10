@@ -125,6 +125,8 @@ No projeto Pages → **Settings → Environment variables** (ou **Variables and 
 | ------------------- | --------------- | ------------------------------------------------------- |
 | `AGENDA_PASSWORD`   | **Encrypt** ✓   | Palavra-passe que vais partilhar com a equipa.          |
 | `SESSION_SECRET`    | **Encrypt** ✓   | String aleatória longa (≥ 32 chars). Usa um gerador.    |
+| `ZOHO_ONLY`         | opcional        | `true` → a app só abre dentro do Zoho CRM (Web Tab). Abrir o URL diretamente mostra "Acesso restrito". Remover/`false` para voltar ao acesso direto. |
+| `FRAME_ANCESTORS`   | opcional        | Domínios autorizados a embeber a app quando `ZOHO_ONLY=true`. Por defeito `https://*.zoho.eu https://*.zoho.com`. |
 
 Gera um `SESSION_SECRET` no terminal:
 

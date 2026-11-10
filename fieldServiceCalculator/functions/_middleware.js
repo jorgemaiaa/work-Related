@@ -134,7 +134,8 @@ document.getElementById('f').addEventListener('submit', async (e) => {
     });
     if (r.ok) { location.reload(); return; }
     if (r.status === 429) { err.textContent = 'Demasiadas tentativas. Tenta dentro de 1 minuto.'; return; }
-    err.textContent = 'Palavra-passe incorrecta.';
+    if (r.status === 401) { err.textContent = 'Palavra-passe incorrecta.'; return; }
+    err.textContent = 'Erro do servidor (HTTP ' + r.status + '). Tenta novamente.';
   } catch (e2) {
     err.textContent = 'Erro de rede: ' + e2.message;
   }
@@ -144,7 +145,50 @@ document.getElementById('f').addEventListener('submit', async (e) => {
 </html>`;
 }
 
+// --- Zoho-only mode (env ZOHO_ONLY=true) ---
+// Browsers label every request with Sec-Fetch-* headers. Opening the URL
+// directly is a top-level navigation (Sec-Fetch-Dest: document) → refused.
+// Framed loads are allowed, and the CSP frame-ancestors header makes the
+// browser render the app only when the framing page is on a Zoho domain.
+// Non-browser clients can fake these headers, so the password still applies.
+const DEFAULT_FRAME_ANCESTORS = 'https://*.zoho.eu https://*.zoho.com';
+
+function isTruthy(v) { return /^(1|true|yes|on)$/i.test(String(v || '').trim()); }
+
+function blockedResponse(isApi) {
+  if (isApi) {
+    return new Response(JSON.stringify({ error: 'zoho only' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return new Response(`<!DOCTYPE html>
+<html lang="pt"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Acesso restrito</title>
+<style>body{font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f6f7f9;color:#1f2530;display:grid;place-items:center;height:100vh;margin:0}
+.box{background:#fff;padding:24px;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.08);max-width:340px}h1{font-size:17px;margin:0 0 6px}p{color:#6b7280;margin:0;font-size:13px}</style>
+</head><body><div class="box"><h1>🔒 Acesso restrito</h1><p>Esta aplicação só está disponível dentro do Zoho CRM.</p></div></body></html>`, {
+    status: 403,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
+
 export async function onRequest(context) {
+  const { request, env } = context;
+  if (!isTruthy(env.ZOHO_ONLY)) return gate(context);
+
+  const site = request.headers.get('Sec-Fetch-Site');
+  const dest = request.headers.get('Sec-Fetch-Dest');
+  if (!site || dest === 'document') {
+    return blockedResponse(new URL(request.url).pathname.startsWith('/api/'));
+  }
+  const res = await gate(context);
+  const out = new Response(res.body, res);
+  out.headers.set('Content-Security-Policy', `frame-ancestors ${env.FRAME_ANCESTORS || DEFAULT_FRAME_ANCESTORS}`);
+  return out;
+}
+
+async function gate(context) {
   const { request, env, next } = context;
   const url = new URL(request.url);
 

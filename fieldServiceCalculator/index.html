@@ -1631,7 +1631,8 @@
           });
           if (r.ok) return finish(true);
           if (r.status === 429) { errEl.textContent = 'Demasiadas tentativas. Tenta dentro de 1 minuto.'; return; }
-          errEl.textContent = 'Palavra-passe incorrecta.';
+          if (r.status === 401) { errEl.textContent = 'Palavra-passe incorrecta.'; return; }
+          errEl.textContent = 'Erro do servidor (HTTP ' + r.status + '). Tenta novamente.';
         } catch (e) {
           errEl.textContent = 'Erro de rede: ' + e.message;
         }
