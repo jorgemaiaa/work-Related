@@ -66,12 +66,23 @@ export async function signSession(ttlMs, secret) {
   return `${expiry}.${sig}`;
 }
 
+// SameSite=None + Partitioned so the session also works when the app is
+// embedded in another site's iframe (Zoho CRM Web Tab). Partitioned (CHIPS)
+// keeps the embedded cookie scoped to that embedding site.
+const COOKIE_ATTRS = 'Path=/; Secure; HttpOnly; SameSite=None; Partitioned';
+
 export function sessionCookie(token, ttlMs) {
   const maxAge = Math.floor(ttlMs / 1000);
-  return `${COOKIE_NAME}=${token}; Path=/; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Lax`;
+  return `${COOKIE_NAME}=${token}; Max-Age=${maxAge}; ${COOKIE_ATTRS}`;
 }
 
 export function clearSessionCookie() {
+  return `${COOKIE_NAME}=; Max-Age=0; ${COOKIE_ATTRS}`;
+}
+
+// Sessions issued before the Partitioned change live in the unpartitioned
+// cookie jar; clear that copy too on logout.
+export function clearLegacySessionCookie() {
   return `${COOKIE_NAME}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`;
 }
 

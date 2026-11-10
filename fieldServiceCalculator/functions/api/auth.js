@@ -3,7 +3,7 @@
 // Login: { password: "..." } → on success, sets the agenda_session cookie.
 // Rate limit: failed attempts per IP are counted in KV with a short TTL.
 
-import { signSession, sessionCookie, clearSessionCookie } from '../_middleware.js';
+import { signSession, sessionCookie, clearSessionCookie, clearLegacySessionCookie } from '../_middleware.js';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const RL_WINDOW_SECONDS = 60;
@@ -64,8 +64,8 @@ export async function onRequestPost({ request, env }) {
 }
 
 export async function onRequestDelete() {
-  return new Response(null, {
-    status: 204,
-    headers: { 'Set-Cookie': clearSessionCookie() },
-  });
+  const headers = new Headers();
+  headers.append('Set-Cookie', clearSessionCookie());
+  headers.append('Set-Cookie', clearLegacySessionCookie());
+  return new Response(null, { status: 204, headers });
 }
