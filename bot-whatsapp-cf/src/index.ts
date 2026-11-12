@@ -1,6 +1,6 @@
 /** Worker: recebe o webhook da Meta e entrega cada mensagem ao Durable Object do cliente. */
 import { PAGINA_DEV, acessoDevPermitido } from "./dev";
-import { conversaDe, registar, type Env, type MensagemRecebida } from "./tipos";
+import { MAX_FOTOGRAMAS, MIME_FOTOGRAMAS, conversaDe, registar, type Env, type MensagemRecebida } from "./tipos";
 import { assinaturaValida, extrairMensagens } from "./whatsapp";
 
 export { Conversa } from "./conversa";
@@ -64,6 +64,7 @@ async function rotasDev(request: Request, env: Env, url: URL): Promise<Response>
         ficheiroBase64?: string;
         nomeFicheiro?: string;
         acumular?: boolean;
+        fotogramas?: { base64: string; segundo: number }[]; // vídeo já convertido em JPEGs pela página /dev
       }>();
       const id = crypto.randomUUID();
       const msg: MensagemRecebida = {
@@ -83,6 +84,15 @@ async function rotasDev(request: Request, env: Env, url: URL): Promise<Response>
         const chave = `${corpo.telefone}/dev-${id}.${pdf ? "pdf" : extensao}`;
         await env.ANEXOS.put(chave, bytes, { httpMetadata: { contentType: mime } });
         Object.assign(msg, { tipo: pdf ? "pdf" : "imagem", mime, mediaChave: chave });
+      }
+      if (corpo.fotogramas?.length) {
+        const prefixo = `${corpo.telefone}/dev-${id}/`;
+        for (const [i, f] of corpo.fotogramas.slice(0, MAX_FOTOGRAMAS).entries()) {
+          const bytes = Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0));
+          const chave = `${prefixo}f${String(i + 1).padStart(2, "0")}_t${Number(f.segundo).toFixed(1)}.jpg`;
+          await env.ANEXOS.put(chave, bytes, { httpMetadata: { contentType: "image/jpeg" } });
+        }
+        Object.assign(msg, { tipo: "video", mime: MIME_FOTOGRAMAS, mediaChave: prefixo });
       }
       const conversa = conversaDe(env, corpo.telefone);
       await conversa.receber(msg, false);

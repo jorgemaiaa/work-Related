@@ -34,7 +34,19 @@ export interface Env {
   DEV_TOKEN?: string; // obrigatório para usar /dev/* fora do localhost (cabeçalho X-Dev-Token)
 }
 
-export type TipoMensagem = "texto" | "imagem" | "pdf" | "outro" | "boas_vindas";
+// "video": guardado como fotogramas JPEG no R2, debaixo do prefixo em media_chave (MIME_FOTOGRAMAS)
+export type TipoMensagem = "texto" | "imagem" | "pdf" | "video" | "outro" | "boas_vindas";
+
+export const MIME_FOTOGRAMAS = "video/fotogramas";
+export const MAX_FOTOGRAMAS = 12;
+
+/** Lista os fotogramas de um vídeo, por ordem, com o segundo em que foram tirados. */
+export async function listarFotogramas(anexos: R2Bucket, prefixo: string): Promise<{ chave: string; segundo: number }[]> {
+  const lista = await anexos.list({ prefix: prefixo });
+  return lista.objects
+    .map((o) => ({ chave: o.key, segundo: Number(/_t([\d.]+)\.jpg$/.exec(o.key)?.[1] ?? 0) }))
+    .sort((a, b) => a.chave.localeCompare(b.chave));
+}
 
 export interface MensagemRecebida {
   waId: string;

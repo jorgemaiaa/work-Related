@@ -40,6 +40,7 @@ A página `/dev` (`src/pagina-dev.html`) é o banco de testes: chat e ficha em t
 - `src/zoho.ts` e `src/zoho-auth.ts`: cliente Zoho e Durable Object único que guarda e renova o access token.
 - `src/whatsapp.ts`: envio de texto, descarga de media, parsing do webhook.
 - `src/dev.ts` e `src/pagina-dev.html`: proteção das rotas `/dev/*` (`DEV_TOKEN`) e página do banco de testes servida em `/dev`.
+- Vídeos: o Claude não lê vídeo. Um vídeo é uma mensagem `tipo = "video"` cujos fotogramas JPEG (até 12, nome `fNN_tSEGUNDOS.jpg`) estão no R2 debaixo do prefixo em `media_chave` (`media_mime = "video/fotogramas"`); `agente.ts` envia-os ao modelo por ordem e o Zoho recebe-os como imagens. Hoje só a página `/dev` extrai fotogramas (no browser); falta a extração para vídeos do WhatsApp (A5c).
 - `src/prompts.ts`: prompt de sistema e mensagens fixas. Contém os marcadores `[EMPRESA]` e `[LINK_PRIVACIDADE]` por preencher.
 
 ## Decisões a manter

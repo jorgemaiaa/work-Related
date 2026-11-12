@@ -77,7 +77,7 @@
     <div id="mensagens" aria-live="polite"></div>
     <form id="envio">
       <button type="button" id="anexar" title="Anexar foto ou PDF">📎</button>
-      <input id="ficheiro" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
+      <input id="ficheiro" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,video/mp4,video/quicktime,video/webm">
       <textarea id="texto" placeholder="Mensagem do cliente (Enter envia, Shift+Enter muda de linha)"></textarea>
       <button type="submit" id="enviar">Enviar</button>
       <label class="opcao" title="Guarda a mensagem sem o bot responder, como quando o cliente envia várias seguidas"><input id="acumular" type="checkbox"> acumular</label>
@@ -134,8 +134,8 @@ async function pedir(caminho, corpo) {
 
 function bolhaMensagem(m) {
   const b = el("div", "bolha " + (m.direcao === "in" ? "in" : "out"));
-  if (m.tipo === "imagem" || m.tipo === "pdf") {
-    const rotulo = el("span", "anexo", (m.tipo === "pdf" ? "PDF" : "foto") + (m.anexo_categoria ? ": " + m.anexo_categoria + (m.anexo_utilizavel ? " ✓" : " ✗") : ""));
+  if (m.tipo === "imagem" || m.tipo === "pdf" || m.tipo === "video") {
+    const rotulo = el("span", "anexo", (m.tipo === "pdf" ? "PDF" : m.tipo === "video" ? "vídeo" : "foto") + (m.anexo_categoria ? ": " + m.anexo_categoria + (m.anexo_utilizavel ? " ✓" : " ✗") : ""));
     b.append(rotulo);
   }
   if (m.texto) b.append(document.createTextNode(m.texto));
@@ -200,7 +200,49 @@ function base64(blob) {
 // Como o WhatsApp: as fotos chegam comprimidas. Lado maior até 1600 px, JPEG 85 %.
 // (O Claude também não aproveita mais de ~1568 px.) PDFs seguem como estão.
 const LADO_MAXIMO = 1600;
+// O Claude não lê vídeo: tiramos fotogramas espaçados (um a cada ~2 s, entre 3 e 12),
+// com o lado maior até 1280 px. Mesmo método que o servidor usará com vídeos do WhatsApp.
+const MAX_FOTOGRAMAS = 12;
+const LADO_FOTOGRAMA = 1280;
+async function fotogramasDoVideo(ficheiro) {
+  const url = URL.createObjectURL(ficheiro);
+  const video = document.createElement("video");
+  video.muted = true; video.playsInline = true; video.preload = "auto"; video.src = url;
+  try {
+    await new Promise((ok, falha) => {
+      video.onloadeddata = ok;
+      video.onerror = () => falha(new Error("o browser não conseguiu abrir " + ficheiro.name + " (formato de vídeo não suportado?)"));
+    });
+    let duracao = video.duration;
+    if (duracao === Infinity) {
+      // Alguns ficheiros (ex.: WebM gravados no browser) não trazem a duração: ir ao fim obriga a calculá-la
+      await new Promise((ok) => { video.ondurationchange = () => { if (video.duration !== Infinity) ok(); }; video.currentTime = 1e9; });
+      duracao = video.duration;
+    }
+    if (!Number.isFinite(duracao) || duracao <= 0) throw new Error("não foi possível ler a duração de " + ficheiro.name);
+    const n = Math.min(MAX_FOTOGRAMAS, Math.max(3, Math.ceil(duracao / 2)));
+    const escala = Math.min(1, LADO_FOTOGRAMA / Math.max(video.videoWidth, video.videoHeight));
+    const tela = document.createElement("canvas");
+    tela.width = Math.round(video.videoWidth * escala);
+    tela.height = Math.round(video.videoHeight * escala);
+    const fotogramas = [];
+    for (let i = 0; i < n; i++) {
+      const segundo = Math.round(((duracao * (i + 0.5)) / n) * 10) / 10;
+      await new Promise((ok) => { video.onseeked = ok; video.currentTime = segundo; });
+      tela.getContext("2d").drawImage(video, 0, 0, tela.width, tela.height);
+      const jpeg = await new Promise((ok) => tela.toBlob(ok, "image/jpeg", 0.8));
+      fotogramas.push({ base64: await base64(jpeg), segundo });
+    }
+    return fotogramas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function prepararFicheiro(ficheiro) {
+  if (ficheiro.type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(ficheiro.name)) {
+    return { fotogramas: await fotogramasDoVideo(ficheiro), nome: ficheiro.name, tipo: "video" };
+  }
   const pdf = ficheiro.name.toLowerCase().endsWith(".pdf") || ficheiro.type === "application/pdf";
   if (pdf) return { base64: await base64(ficheiro), nome: ficheiro.name, tipo: "pdf" };
   let imagem;
@@ -248,6 +290,7 @@ $("envio").addEventListener("submit", async (ev) => {
       const ultima = i === mensagens.length - 1;
       const corpo = { telefone: $("telefone").value, acumular: acumularTudo || !ultima, texto: m.texto || null };
       if (m.base64) { corpo.ficheiroBase64 = m.base64; corpo.nomeFicheiro = m.nome; }
+      if (m.fotogramas) corpo.fotogramas = m.fotogramas;
       $("mensagens").append(bolhaMensagem({ direcao: "in", tipo: m.tipo || "texto", texto: m.texto }));
       if (!corpo.acumular) {
         aEscrever = el("div", "a-escrever", "a escrever…");

@@ -1,7 +1,7 @@
 /** Um turno da conversa: monta o pedido ao Claude, executa as ferramentas e devolve a resposta. */
 import * as F from "./ficha";
 import { MENSAGEM_FALHA, PROMPT_SISTEMA, contextoDinamico } from "./prompts";
-import { registar, type Env, type Estado, type LinhaMensagem } from "./tipos";
+import { listarFotogramas, registar, type Env, type Estado, type LinhaMensagem } from "./tipos";
 
 const MAX_ITERACOES = 8;
 const TIPOS_IMAGEM = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -19,7 +19,7 @@ export const FERRAMENTAS = [
   },
   {
     name: "registar_anexo",
-    description: "Classifica uma foto ou PDF recebido ([anexo id=N]) e indica se é utilizável.",
+    description: "Classifica uma foto, PDF ou vídeo recebido ([anexo id=N]) e indica se é utilizável. Um vídeo é um único anexo.",
     strict: true,
     input_schema: {
       type: "object",
@@ -89,12 +89,14 @@ export function anexosValidos(sql: SqlStorage): Set<string> {
 }
 
 async function conteudoCliente(m: LinhaMensagem, comFicheiro: boolean, anexos: R2Bucket): Promise<Bloco[]> {
-  if (m.tipo !== "imagem" && m.tipo !== "pdf") return [{ type: "text", text: m.texto || "[mensagem vazia]" }];
+  if (m.tipo !== "imagem" && m.tipo !== "pdf" && m.tipo !== "video") return [{ type: "text", text: m.texto || "[mensagem vazia]" }];
 
-  let rotulo = `[anexo id=${m.id}, ${m.tipo === "imagem" ? "foto" : "PDF"}]`;
+  let rotulo = `[anexo id=${m.id}, ${m.tipo === "imagem" ? "foto" : m.tipo === "video" ? "vídeo" : "PDF"}]`;
   if (m.texto) rotulo += ` Legenda: ${m.texto}`;
   if (m.anexo_categoria) rotulo += ` (já registado como ${m.anexo_categoria}, utilizável: ${m.anexo_utilizavel ? "sim" : "não"})`;
   if (!comFicheiro) return [{ type: "text", text: rotulo }]; // anexos antigos só como texto, para poupar tokens
+
+  if (m.tipo === "video") return conteudoVideo(m, rotulo, anexos);
 
   const objeto = m.media_chave ? await anexos.get(m.media_chave) : null;
   if (!objeto) return [{ type: "text", text: `${rotulo} [não foi possível descarregar o ficheiro]` }];
@@ -111,6 +113,27 @@ async function conteudoCliente(m: LinhaMensagem, comFicheiro: boolean, anexos: R
     { type: "text", text: rotulo },
     { type: "document", source: { type: "base64", media_type: "application/pdf", data: dados } },
   ];
+}
+
+/** Vídeo: o modelo não lê vídeo, por isso recebe os fotogramas em sequência, com o segundo de cada um. */
+async function conteudoVideo(m: LinhaMensagem, rotulo: string, anexos: R2Bucket): Promise<Bloco[]> {
+  const fotogramas = m.media_chave ? await listarFotogramas(anexos, m.media_chave) : [];
+  if (!fotogramas.length) return [{ type: "text", text: `${rotulo} [não foi possível obter imagens do vídeo]` }];
+  const blocos: Bloco[] = [
+    {
+      type: "text",
+      text: `${rotulo} [${fotogramas.length} fotogramas do vídeo, por ordem; tratar como um único anexo]`,
+    },
+  ];
+  for (const [i, f] of fotogramas.entries()) {
+    const objeto = await anexos.get(f.chave);
+    if (!objeto || objeto.size > MAX_BYTES_IMAGEM) continue;
+    blocos.push(
+      { type: "text", text: `Fotograma ${i + 1}/${fotogramas.length}, aos ${f.segundo} s` },
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: paraBase64(await objeto.arrayBuffer()) } },
+    );
+  }
+  return blocos;
 }
 
 /** Junta mensagens seguidas do mesmo lado; a API exige alternância user/assistant. */
@@ -158,7 +181,7 @@ function executarFerramenta(ctx: ContextoTurno, nome: string, dados: Record<stri
     const m = ctx.sql
       .exec<{ tipo: string }>("SELECT tipo FROM mensagens WHERE id = ? AND direcao = 'in'", id)
       .toArray()[0];
-    if (!m || (m.tipo !== "imagem" && m.tipo !== "pdf")) return { erro: "anexo_id não existe nesta conversa" };
+    if (!m || (m.tipo !== "imagem" && m.tipo !== "pdf" && m.tipo !== "video")) return { erro: "anexo_id não existe nesta conversa" };
     const categoria = String(dados.categoria).toLowerCase();
     if (!F.CATEGORIAS_ANEXO.includes(categoria)) return { erro: `categoria '${categoria}' inválida` };
     ctx.sql.exec(

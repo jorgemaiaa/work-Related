@@ -9,7 +9,7 @@ import { DurableObject } from "cloudflare:workers";
 import { anexosValidos, executarTurno } from "./agente";
 import { CAMPOS, camposEmFalta } from "./ficha";
 import { BOAS_VINDAS, MENSAGEM_FALHA, MENSAGEM_POS_CONCLUSAO } from "./prompts";
-import { estadoInicial, registar, type Env, type Estado, type LinhaMensagem, type MensagemRecebida } from "./tipos";
+import { MIME_FOTOGRAMAS, estadoInicial, listarFotogramas, registar, type Env, type Estado, type LinhaMensagem, type MensagemRecebida } from "./tipos";
 import { WhatsApp } from "./whatsapp";
 import { ZohoCliente } from "./zoho";
 import { montarDados } from "./zoho-mapa";
@@ -214,6 +214,17 @@ export class Conversa extends DurableObject<Env> {
         )
         .toArray();
       for (const m of anexos) {
+        if (m.media_mime === MIME_FOTOGRAMAS) {
+          // Vídeo: vão os fotogramas como imagens (o vídeo original não é guardado)
+          for (const [i, f] of (await listarFotogramas(this.env.ANEXOS, m.media_chave!)).entries()) {
+            const objeto = await this.env.ANEXOS.get(f.chave);
+            if (!objeto) continue;
+            const nome = `${m.anexo_categoria}_${m.id}_video_${String(i + 1).padStart(2, "0")}.jpg`;
+            await zoho.anexar(e.zohoRegistoId, nome, await objeto.arrayBuffer(), "image/jpeg");
+          }
+          this.sql.exec("UPDATE mensagens SET zoho_anexo_enviado = 1 WHERE id = ?", m.id);
+          continue;
+        }
         const objeto = await this.env.ANEXOS.get(m.media_chave!);
         if (!objeto) continue;
         const extensao = m.media_chave!.slice(m.media_chave!.lastIndexOf("."));
