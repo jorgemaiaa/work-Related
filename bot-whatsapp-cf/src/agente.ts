@@ -30,7 +30,7 @@ export const FERRAMENTAS = [
         nota: {
           type: "string",
           description:
-            "O que se vê, ou porque não é utilizável. Para quadro_aberto, quadro_estacionamento e quadro_servicos_comuns, descreve o aparelho geral e o diferencial: número de polos (módulos ligados pela mesma alavanca) e marcações legíveis (ex.: 'geral 2P 40 A, diferencial 2P 30 mA' ou 'geral 4P 400 V').",
+            "O que se vê, ou porque não é utilizável. Para quadro_aberto, quadro_estacionamento e quadro_servicos_comuns, descreve o aparelho geral e o diferencial: número de polos (módulos ligados pela mesma alavanca) e marcações legíveis (ex.: 'geral 2P 40 A, diferencial 2P 30 mA' ou 'geral 4P 400 V'). Para contador, indica o que diz sobre as fases (ex.: '3 x 230/400 V' ou '1 x 230 V') e os polos do disjuntor junto a ele.",
         },
       },
       required: ["anexo_id", "categoria", "utilizavel", "nota"],

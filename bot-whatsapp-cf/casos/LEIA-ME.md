@@ -31,16 +31,17 @@ Cada caso chama o Claude real várias vezes: correr a bateria completa tem custo
     "sem_alertas": true,
     "em_falta_contem": ["anexo:quadro_aberto"],
     "em_falta_nao_contem": ["rede"],
-    "anexos_validos": ["quadro_aberto"]
+    "anexos_validos": ["quadro_aberto"],
+    "resposta_contem": ["contador"]          // palavra que tem de aparecer na última resposta do bot
   }
 }
 ```
 
-Todas as chaves de `esperado` são opcionais. Os textos comparam-se sem distinguir maiúsculas.
+Todas as chaves de `esperado` são opcionais. Os textos comparam-se sem distinguir maiúsculas. Use `resposta_contem` só para palavras que o bot tem de usar de certeza (por exemplo, "contador" quando pede essa foto); uma lista dentro da lista aceita alternativas (`[["contador", "contagem"]]`).
 
 ## Fotos
 
-Os ficheiros de `fotos/` não vão para o Git (podem ter dados de clientes). Um caso que use um ficheiro em falta aparece como "ignorado". O caso `completa-com-fotos` precisa de `fotos/quadro.jpg`, `fotos/local.jpg` e `fotos/fatura.pdf`; os casos `rede-quadro-2-polos` e `rede-quadro-4-polos-sem-certeza` precisam de `fotos/quadro-2-polos.jpg` (quadro com geral ou diferencial de 2 polos) e `fotos/quadro-4-polos.jpg` (quadro com diferencial de 4 polos, como um Hager CF425).
+Os ficheiros de `fotos/` não vão para o Git (podem ter dados de clientes). Um caso que use um ficheiro em falta aparece como "ignorado". O caso `completa-com-fotos` precisa de `fotos/quadro.jpg`, `fotos/local.jpg` e `fotos/fatura.pdf`; os casos `rede-quadro-2-polos` e `rede-quadro-4-polos-sem-certeza` precisam de `fotos/quadro-2-polos.jpg` (quadro com geral ou diferencial de 2 polos) e `fotos/quadro-4-polos.jpg` (quadro com diferencial de 4 polos, como um Hager CF425); o caso `rede-pela-foto-do-contador` precisa também de `fotos/contador.jpg`.
 
 ## Acrescentar casos
 

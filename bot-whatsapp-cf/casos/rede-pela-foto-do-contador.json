@@ -1,0 +1,25 @@
+{
+  "descricao": "Depois de um quadro de 4 polos, a foto do contador decide a rede (precisa de fotos/quadro-4-polos.jpg e fotos/contador.jpg)",
+  "mensagens": [
+    {
+      "texto": "Boa tarde, queria instalar um carregador. É uma moradia com garagem."
+    },
+    {
+      "ficheiro": "fotos/quadro-4-polos.jpg",
+      "texto": "Aqui está o quadro elétrico"
+    },
+    {
+      "ficheiro": "fotos/contador.jpg",
+      "texto": "Este é o contador"
+    }
+  ],
+  "esperado": {
+    "preenchidos": [
+      "rede"
+    ],
+    "anexos_validos": [
+      "quadro_aberto",
+      "contador"
+    ]
+  }
+}

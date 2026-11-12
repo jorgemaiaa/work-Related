@@ -112,6 +112,7 @@ export const CATEGORIAS_ANEXO = [
   "fatura_eletricidade",
   "quadro_servicos_comuns",
   "quadro_estacionamento",
+  "contador",
   "outra",
 ];
 const ANEXOS_OBRIGATORIOS = ["quadro_aberto", "local_carregador", "fatura_eletricidade"];

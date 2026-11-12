@@ -78,6 +78,14 @@ function comparar(esperado, final) {
   for (const c of esperado.em_falta_contem ?? []) {
     if (!final.emFalta.includes(c)) falhas.push(`em falta: devia incluir ${c} (obtido ${mostrar(final.emFalta)})`);
   }
+  // Texto da última resposta do bot: só para palavras que têm de aparecer de certeza (o texto varia)
+  for (const palavra of esperado.resposta_contem ?? []) {
+    const aceites = [].concat(palavra);
+    const texto = final.ultimaResposta.toLowerCase();
+    if (!aceites.some((p) => texto.includes(p.toLowerCase()))) {
+      falhas.push(`última resposta: devia conter ${aceites.map((p) => `"${p}"`).join(" ou ")} (obtido: ${mostrar(final.ultimaResposta.slice(0, 200))})`);
+    }
+  }
   for (const c of esperado.em_falta_nao_contem ?? []) {
     if (final.emFalta.includes(c)) falhas.push(`em falta: não devia incluir ${c}`);
   }
@@ -90,15 +98,18 @@ function comparar(esperado, final) {
 async function correrCaso(nome, caso) {
   const telefone = caso.telefone ?? telefoneDe(nome);
   await pedir("/dev/reset", { telefone });
+  let ultimaResposta = "";
   for (const m of caso.mensagens) {
     const corpo = { telefone, acumular: !!m.acumular, texto: m.texto ?? null };
     if (m.ficheiro) {
       corpo.ficheiroBase64 = (await readFile(m.ficheiro)).toString("base64");
       corpo.nomeFicheiro = basename(m.ficheiro);
     }
-    await pedir("/dev/mensagem", corpo);
+    const { respostas } = await pedir("/dev/mensagem", corpo);
+    if (respostas.length) ultimaResposta = respostas.join("\n");
   }
   const final = await pedir(`/dev/ficha?telefone=${telefone}`);
+  final.ultimaResposta = ultimaResposta;
   return { falhas: comparar(caso.esperado ?? {}, final), final, telefone };
 }
 

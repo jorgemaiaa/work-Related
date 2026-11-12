@@ -64,6 +64,7 @@ A página `/dev` (`src/pagina-dev.html`) é o banco de testes: chat e ficha em t
 - Segredos nunca no código nem no Git: `.dev.vars` (local, gerado por `scripts/preparar-codespace.sh`) e `wrangler secret put` (produção). No Codespace, a chave do bot é o secret `BOT_ANTHROPIC_API_KEY`.
 - Antes de dar uma tarefa por concluída: `npm run verificar`, `npm run testar` e uma conversa no simulador ou no banco de testes que exercite a alteração. Se a alteração mexer no comportamento do bot, correr também `npm run casos`.
 - Quando aparecer um erro numa conversa, acrescentar um caso em `casos/` que o reproduza.
+- **Regras técnicas aprendidas nos testes** (o modelo não aprende sozinho com as conversas): escrevê-las no prompt (`src/prompts.ts`, por exemplo o bloco `<rede_pela_foto>`) e criar um caso em `casos/` que as verifique. Exemplo: um diferencial de 4 polos não prova trifásico; o bot pede a foto do contador.
 
 ## Pontos por confirmar nas APIs reais
 
