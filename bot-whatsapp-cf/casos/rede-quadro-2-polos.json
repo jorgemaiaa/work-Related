@@ -1,0 +1,11 @@
+{
+  "descricao": "Geral ou diferencial de 2 polos na foto do quadro: monofásica com certeza (precisa de fotos/quadro-2-polos.jpg)",
+  "mensagens": [
+    { "texto": "Boa tarde, queria instalar um carregador. É uma moradia com garagem." },
+    { "ficheiro": "fotos/quadro-2-polos.jpg", "texto": "Aqui está o quadro elétrico" }
+  ],
+  "esperado": {
+    "ficha": { "rede": "monofasica" },
+    "anexos_validos": ["quadro_aberto"]
+  }
+}

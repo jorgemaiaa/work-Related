@@ -40,7 +40,7 @@ Todas as chaves de `esperado` são opcionais. Os textos comparam-se sem distingu
 
 ## Fotos
 
-Os ficheiros de `fotos/` não vão para o Git (podem ter dados de clientes). Um caso que use um ficheiro em falta aparece como "ignorado". O caso `completa-com-fotos` precisa de `fotos/quadro.jpg`, `fotos/local.jpg` e `fotos/fatura.pdf`; o caso `rede-pela-foto-do-quadro` precisa de `fotos/quadro-trifasico.jpg` (a foto de um quadro trifásico).
+Os ficheiros de `fotos/` não vão para o Git (podem ter dados de clientes). Um caso que use um ficheiro em falta aparece como "ignorado". O caso `completa-com-fotos` precisa de `fotos/quadro.jpg`, `fotos/local.jpg` e `fotos/fatura.pdf`; os casos `rede-quadro-2-polos` e `rede-quadro-4-polos-sem-certeza` precisam de `fotos/quadro-2-polos.jpg` (quadro com geral ou diferencial de 2 polos) e `fotos/quadro-4-polos.jpg` (quadro com diferencial de 4 polos, como um Hager CF425).
 
 ## Acrescentar casos
 

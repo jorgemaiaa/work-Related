@@ -1,0 +1,11 @@
+{
+  "descricao": "Diferencial de 4 polos na foto do quadro não chega para decidir a rede: não regista (precisa de fotos/quadro-4-polos.jpg)",
+  "mensagens": [
+    { "texto": "Boa tarde, queria instalar um carregador. É uma moradia com garagem." },
+    { "ficheiro": "fotos/quadro-4-polos.jpg", "texto": "Aqui está o quadro elétrico" }
+  ],
+  "esperado": {
+    "vazios": ["rede"],
+    "anexos_validos": ["quadro_aberto"]
+  }
+}
